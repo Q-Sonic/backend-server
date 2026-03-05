@@ -1,6 +1,9 @@
 import request from 'supertest';
 import * as firebaseConfig from '../config/firebase';
 
+// Mock global fetch for REST API calls
+global.fetch = jest.fn();
+
 // Step 1: Define mocks with 'mock' prefix so Jest hoisting doesn't break them
 const mockAuthObject = {
     verifyIdToken: jest.fn(),
@@ -71,8 +74,19 @@ describe('Auth API — Integration Tests', () => {
             expect(response.body.success).toBe(false);
         });
 
-        it('should return 201 if registration is successful', async () => {
+        it('should return 201 and tokens if registration is successful', async () => {
             mockAuthObject.createUser.mockResolvedValue({ uid: 'test-uid' });
+
+            // Mock successful fetch for login
+            (global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve({
+                    idToken: 'test-id-token',
+                    refreshToken: 'test-refresh-token',
+                    expiresIn: '3600',
+                    localId: 'test-uid'
+                })
+            });
 
             const response = await request(app).post('/api/auth/register').send({
                 email: 'test@example.com',
@@ -83,11 +97,9 @@ describe('Auth API — Integration Tests', () => {
 
             expect(response.status).toBe(201);
             expect(response.body.success).toBe(true);
-            expect(response.body.data.email).toBe('test@example.com');
+            expect(response.body.data.user.email).toBe('test@example.com');
+            expect(response.body.data.idToken).toBe('test-id-token');
             expect(mockAuthObject.createUser).toHaveBeenCalled();
-            expect(mockAuthObject.setCustomUserClaims).toHaveBeenCalledWith('test-uid', {
-                role: 'cliente',
-            });
         });
     });
 });

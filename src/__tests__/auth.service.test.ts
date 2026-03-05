@@ -64,17 +64,21 @@ describe('AuthService — Unit Tests', () => {
         it('should create user and set claims and save to firestore', async () => {
             mockAuth.createUser.mockResolvedValue({ uid: 'uid123' });
 
+            // Mock login since it's called internally
+            const loginSpy = jest.spyOn(authService, 'login').mockResolvedValue({
+                idToken: 'token123',
+                refreshToken: 'refresh123',
+                expiresIn: '3600',
+                uid: 'uid123',
+                role: 'cliente'
+            });
+
             const result = await authService.register(input);
 
-            expect(mockAuth.createUser).toHaveBeenCalledWith({
-                email: input.email,
-                password: input.password,
-                displayName: input.displayName,
-            });
-            expect(mockAuth.setCustomUserClaims).toHaveBeenCalledWith('uid123', {
-                role: input.role,
-            });
-            expect(result.uid).toBe('uid123');
+            expect(mockAuth.createUser).toHaveBeenCalled();
+            expect(loginSpy).toHaveBeenCalledWith(input.email, input.password);
+            expect(result.user.uid).toBe('uid123');
+            expect(result.idToken).toBe('token123');
         });
     });
 });

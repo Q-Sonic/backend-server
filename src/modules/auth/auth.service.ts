@@ -1,5 +1,5 @@
 import { getAuth, getFirestore, admin, initFirebase } from '../../config/firebase';
-import { UserRecord, UserRole, LoginResponse } from '../../types';
+import { UserRecord, UserRole, LoginResponse, RegisterResponse } from '../../types';
 import { getEnv } from '../../config/env';
 
 interface RegisterInput {
@@ -23,7 +23,7 @@ export class AuthService {
     return re.test(email);
   }
 
-  async register(input: RegisterInput): Promise<UserRecord> {
+  async register(input: RegisterInput): Promise<RegisterResponse> {
     if (!this.validateEmail(input.email)) {
       throw new Error('Formato de email inválido');
     }
@@ -51,7 +51,13 @@ export class AuthService {
 
     await this.db.collection('users').doc(firebaseUser.uid).set(userRecord);
 
-    return userRecord;
+    // 4. Hacer Login automático para obtener tokens
+    const loginData = await this.login(input.email, input.password);
+
+    return {
+      ...loginData,
+      user: userRecord,
+    };
   }
 
   async login(email: string, password: string): Promise<LoginResponse> {

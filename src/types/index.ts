@@ -41,3 +41,8 @@ export interface LoginResponse {
     uid: string;
     role: UserRole;
 }
+
+// ─── Respuesta de Registro (incluye tokens para login automático) ───────────
+export interface RegisterResponse extends LoginResponse {
+    user: UserRecord;
+}

@@ -26,14 +26,15 @@ Verifica que el servidor está corriendo.
 ## Auth
 
 ### `POST /auth/register`
-Crea un nuevo usuario en Firebase Auth + Firestore.
+Crea un nuevo usuario en Firebase Auth + Firestore. Al completar el registro con éxito, el usuario **queda autenticado automáticamente** y recibe los tokens de sesión.
 
 **Body**
 ```json
 {
   "email": "user@example.com",
   "password": "securePassword123",
-  "displayName": "John Doe"
+  "displayName": "John Doe",
+  "role": "artista"
 }
 ```
 
@@ -42,15 +43,54 @@ Crea un nuevo usuario en Firebase Auth + Firestore.
 {
   "success": true,
   "data": {
+    "idToken": "eyJhbG...",
+    "refreshToken": "...",
+    "expiresIn": "3600",
     "uid": "abc123",
-    "email": "user@example.com",
-    "displayName": "John Doe",
-    "createdAt": "...",
-    "updatedAt": "..."
+    "role": "artista",
+    "user": {
+      "uid": "abc123",
+      "email": "user@example.com",
+      "displayName": "John Doe",
+      "role": "artista"
+    }
   },
   "message": "User registered successfully"
 }
 ```
+
+### `POST /auth/login`
+Inicia sesión con email y contraseña. Retorna tokens de autenticación y el rol del usuario.
+
+**Body**
+```json
+{
+  "email": "user@example.com",
+  "password": "securePassword123"
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": {
+    "idToken": "eyJhbG...",
+    "refreshToken": "...",
+    "expiresIn": "3600",
+    "uid": "abc123",
+    "role": "artista"
+  }
+}
+```
+
+### Roles Disponibles
+El sistema utiliza **Firebase Custom Claims** para asignar roles. Los roles permitidos son:
+- `cliente` (Default)
+- `artista`
+- `organizacion`
+- `admin`
+- `soporte`
 
 ### `GET /auth/me` 🔒
 Retorna el perfil del usuario autenticado.

@@ -10,6 +10,7 @@
 | [firebase-setup.md](./firebase-setup.md) | Cómo configurar Firebase para el proyecto |
 | [docker.md](./docker.md) | Guía de Docker y despliegue |
 | [api-reference.md](./api-reference.md) | Referencia rápida de endpoints |
+| [testing.md](./testing.md) | Guía de pruebas unitarias y de integración |
 
 La documentación interactiva de la API (Swagger UI) está disponible en:
 ```

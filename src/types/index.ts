@@ -66,3 +66,47 @@ export interface CreateArtistServiceInput {
 }
 
 export type UpdateArtistServiceInput = Partial<CreateArtistServiceInput>;
+
+// ─── Perfil de cliente (US-6, US-7) ───────────────────────────────────────────
+export interface ClientProfileRecord {
+    uid: string;
+    name: string;
+    phone: string;
+    location: string;
+    photo: string;
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export interface CreateOrUpdateClientProfileInput {
+    name?: string;
+    phone?: string;
+    location?: string;
+    photo?: string;
+}
+
+// ─── Perfil de artista (US-10) ────────────────────────────────────────────────
+export interface SocialNetworks {
+    instagram?: string;
+    facebook?: string;
+    twitter?: string;
+    youtube?: string;
+    tiktok?: string;
+}
+
+export interface ArtistProfileRecord {
+    uid: string;
+    biography: string;
+    socialNetworks: SocialNetworks;
+    photo: string;
+    city: string;
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export interface CreateOrUpdateArtistProfileInput {
+    biography?: string;
+    socialNetworks?: SocialNetworks;
+    photo?: string;
+    city?: string;
+}

@@ -7,6 +7,8 @@ import authRoutes from './modules/auth/auth.routes';
 import usersRoutes from './modules/users/users.routes';
 import storageRoutes from './modules/storage/storage.routes';
 import artistServicesRoutes from './modules/artist-services/artist-services.routes';
+import clientProfilesRoutes from './modules/client-profiles/client-profiles.routes';
+import artistProfilesRoutes from './modules/artist-profiles/artist-profiles.routes';
 import { errorMiddleware } from './middleware/error.middleware';
 import { sendSuccess } from './utils/response.util';
 import { setupSwagger } from './config/swagger';
@@ -29,6 +31,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/artist-services', artistServicesRoutes);
+app.use('/api/client-profiles', clientProfilesRoutes);
+app.use('/api/artist-profiles', artistProfilesRoutes);
 
 // ─── Swagger Docs ─────────────────────────────────────────────────────────────
 setupSwagger(app);

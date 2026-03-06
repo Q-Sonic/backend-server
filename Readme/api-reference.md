@@ -196,6 +196,109 @@ Elimina un servicio (solo si pertenece al artista).
 
 ---
 
+## Client Profile (US-6, US-7 — Perfil de cliente) 🔒
+
+Solo usuarios con rol **cliente**. Colección `client_profiles` en Firestore (documento por `uid`).
+
+### `GET /client-profiles`
+Obtiene el perfil del cliente autenticado.
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": {
+    "uid": "userUid",
+    "name": "Juan Pérez",
+    "phone": "+34 600 000 000",
+    "location": "Madrid, España",
+    "photo": "https://...",
+    "createdAt": "...",
+    "updatedAt": "..."
+  }
+}
+```
+
+### `PUT /client-profiles`
+Crea o actualiza el perfil del cliente. Todos los campos son opcionales.
+
+**Body**
+```json
+{
+  "name": "Juan Pérez",
+  "phone": "+34 600 000 000",
+  "location": "Madrid, España",
+  "photo": "https://storage.../photo.jpg"
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": { "uid": "...", "name": "...", "phone": "...", "location": "...", "photo": "...", "createdAt": "...", "updatedAt": "..." },
+  "message": "Profile saved"
+}
+```
+
+---
+
+## Artist Profile (US-10 — Perfil público artista) 🔒
+
+Solo usuarios con rol **artista**. Colección `artist_profiles` en Firestore (documento por `uid`).
+
+### `GET /artist-profiles`
+Obtiene el perfil del artista autenticado.
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": {
+    "uid": "artistUid",
+    "biography": "Biografía del artista...",
+    "socialNetworks": {
+      "instagram": "https://instagram.com/...",
+      "facebook": "https://facebook.com/...",
+      "youtube": "https://youtube.com/..."
+    },
+    "photo": "https://...",
+    "city": "Barcelona",
+    "createdAt": "...",
+    "updatedAt": "..."
+  }
+}
+```
+
+### `PUT /artist-profiles`
+Crea o actualiza el perfil del artista. Todos los campos son opcionales. `socialNetworks` se fusiona con los valores existentes.
+
+**Body**
+```json
+{
+  "biography": "Biografía del artista...",
+  "socialNetworks": {
+    "instagram": "https://instagram.com/...",
+    "facebook": "https://facebook.com/...",
+    "youtube": "https://youtube.com/...",
+    "tiktok": "https://tiktok.com/..."
+  },
+  "photo": "https://storage.../photo.jpg",
+  "city": "Barcelona"
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": { "uid": "...", "biography": "...", "socialNetworks": {...}, "photo": "...", "city": "...", "createdAt": "...", "updatedAt": "..." },
+  "message": "Profile saved"
+}
+```
+
+---
+
 ## Storage
 
 ### `POST /storage/upload` 🔒

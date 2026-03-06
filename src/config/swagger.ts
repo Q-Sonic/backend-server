@@ -141,6 +141,58 @@ const options: swaggerJsdoc.Options = {
                         description: { type: 'string', example: 'Show en vivo' },
                     },
                 },
+                ClientProfileRecord: {
+                    type: 'object',
+                    properties: {
+                        uid: { type: 'string' },
+                        name: { type: 'string', example: 'Juan Pérez' },
+                        phone: { type: 'string', example: '+34 600 000 000' },
+                        location: { type: 'string', example: 'Madrid, España' },
+                        photo: { type: 'string', example: 'https://...' },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                },
+                CreateOrUpdateClientProfileBody: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string' },
+                        phone: { type: 'string' },
+                        location: { type: 'string' },
+                        photo: { type: 'string' },
+                    },
+                },
+                SocialNetworks: {
+                    type: 'object',
+                    properties: {
+                        instagram: { type: 'string' },
+                        facebook: { type: 'string' },
+                        twitter: { type: 'string' },
+                        youtube: { type: 'string' },
+                        tiktok: { type: 'string' },
+                    },
+                },
+                ArtistProfileRecord: {
+                    type: 'object',
+                    properties: {
+                        uid: { type: 'string' },
+                        biography: { type: 'string' },
+                        socialNetworks: { $ref: '#/components/schemas/SocialNetworks' },
+                        photo: { type: 'string' },
+                        city: { type: 'string', example: 'Barcelona' },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                },
+                CreateOrUpdateArtistProfileBody: {
+                    type: 'object',
+                    properties: {
+                        biography: { type: 'string' },
+                        socialNetworks: { $ref: '#/components/schemas/SocialNetworks' },
+                        photo: { type: 'string' },
+                        city: { type: 'string' },
+                    },
+                },
             },
         },
         tags: [
@@ -149,6 +201,8 @@ const options: swaggerJsdoc.Options = {
             { name: 'Users', description: 'CRUD de usuarios (requiere auth)' },
             { name: 'Storage', description: 'Gestión de archivos en Firebase Storage' },
             { name: 'Artist Services', description: 'CRUD de servicios/precios del artista (concierto, acústico, evento privado)' },
+            { name: 'Client Profile', description: 'Perfil de cliente (US-6, US-7)' },
+            { name: 'Artist Profile', description: 'Perfil público del artista (US-10)' },
         ],
         paths: {
             '/health': {
@@ -513,6 +567,110 @@ const options: swaggerJsdoc.Options = {
                         '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                         '403': { description: 'Solo artistas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                         '404': { description: 'Servicio no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/client-profiles/me': {
+                get: {
+                    tags: ['Client Profile'],
+                    summary: 'Obtener perfil del cliente (US-6, US-7)',
+                    security: [{ bearerAuth: [] }],
+                    responses: {
+                        '200': {
+                            description: 'Perfil del cliente',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ClientProfileRecord' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo clientes', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '404': { description: 'Perfil no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/client-profiles': {
+                put: {
+                    tags: ['Client Profile'],
+                    summary: 'Crear o actualizar perfil del cliente',
+                    security: [{ bearerAuth: [] }],
+                    requestBody: {
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateOrUpdateClientProfileBody' } } },
+                    },
+                    responses: {
+                        '200': {
+                            description: 'Perfil guardado',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ClientProfileRecord' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo clientes', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/artist-profiles/me': {
+                get: {
+                    tags: ['Artist Profile'],
+                    summary: 'Obtener perfil del artista (US-10)',
+                    security: [{ bearerAuth: [] }],
+                    responses: {
+                        '200': {
+                            description: 'Perfil del artista',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ArtistProfileRecord' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo artistas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '404': { description: 'Perfil no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/artist-profiles': {
+                put: {
+                    tags: ['Artist Profile'],
+                    summary: 'Crear o actualizar perfil del artista',
+                    security: [{ bearerAuth: [] }],
+                    requestBody: {
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateOrUpdateArtistProfileBody' } } },
+                    },
+                    responses: {
+                        '200': {
+                            description: 'Perfil guardado',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ArtistProfileRecord' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo artistas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                     },
                 },
             },

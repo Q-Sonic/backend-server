@@ -43,3 +43,19 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
         sendNotFound(res, err instanceof Error ? err.message : 'User not found');
     }
 }
+
+export async function createArtist(req: Request, res: Response): Promise<void> {
+    try {
+        const { email, password, displayName } = req.body;
+
+        if (!email || !password || !displayName) {
+            sendError({ res, error: 'Email, password and display name are required', statusCode: 400 });
+            return;
+        }
+
+        const newUser = await usersService.createArtist(email, password, displayName);
+        sendSuccess(res, newUser, 'Artist account created successfully', 201);
+    } catch (err: any) {
+        sendError({ res, error: err.message || 'Failed to create artist', statusCode: 500 });
+    }
+}

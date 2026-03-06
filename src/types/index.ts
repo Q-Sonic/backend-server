@@ -1,8 +1,9 @@
 import { Request } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
+import { UserRoleEnum } from '../enum/roles.enum';
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
-export type UserRole = 'cliente' | 'artista' | 'organizacion' | 'admin' | 'soporte';
+export type UserRole = UserRoleEnum.CLIENTE | UserRoleEnum.ARTISTA | UserRoleEnum.ORGANIZACION | UserRoleEnum.ADMIN | UserRoleEnum.SOPORTE;
 
 // ─── Custom Claims embebidos en el JWT de Firebase ────────────────────────────
 export interface UserClaims {
@@ -46,3 +47,22 @@ export interface LoginResponse {
 export interface RegisterResponse extends LoginResponse {
     user: UserRecord;
 }
+
+// ─── Servicio del artista (tipo de espectáculo con precio) ──────────────────
+export interface ArtistServiceRecord {
+    id: string;
+    artistId: string;
+    name: string;
+    price: number;
+    description: string;
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export interface CreateArtistServiceInput {
+    name: string;
+    price: number;
+    description: string;
+}
+
+export type UpdateArtistServiceInput = Partial<CreateArtistServiceInput>;

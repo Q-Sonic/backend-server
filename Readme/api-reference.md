@@ -129,6 +129,73 @@ Elimina el usuario de Firestore y Firebase Auth.
 
 ---
 
+## Artist Services (US-3 — Precios del artista) 🔒
+
+Solo usuarios con rol **artista** pueden acceder. Cada artista gestiona sus propios servicios (concierto, acústico, evento privado).
+
+### `GET /artist-services`
+Lista los servicios del artista autenticado.
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "docId123",
+      "artistId": "artistUid",
+      "name": "Concierto",
+      "price": 500,
+      "description": "Show en vivo con banda completa",
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ]
+}
+```
+
+### `GET /artist-services/:id`
+Obtiene un servicio por ID (solo si pertenece al artista).
+
+### `POST /artist-services`
+Crea un nuevo servicio.
+
+**Body**
+```json
+{
+  "name": "Concierto",
+  "price": 500,
+  "description": "Show en vivo con banda completa"
+}
+```
+`name` y `price` son obligatorios. `description` es opcional.
+
+**Response 201**
+```json
+{
+  "success": true,
+  "data": { "id": "...", "artistId": "...", "name": "Concierto", "price": 500, "description": "...", "createdAt": "...", "updatedAt": "..." },
+  "message": "Artist service created"
+}
+```
+
+### `PUT /artist-services/:id`
+Actualiza un servicio (solo si pertenece al artista). Campos opcionales: `name`, `price`, `description`.
+
+**Body** (todos opcionales)
+```json
+{
+  "name": "Concierto Premium",
+  "price": 600,
+  "description": "Nueva descripción"
+}
+```
+
+### `DELETE /artist-services/:id`
+Elimina un servicio (solo si pertenece al artista).
+
+---
+
 ## Storage
 
 ### `POST /storage/upload` 🔒

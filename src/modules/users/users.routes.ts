@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getAllUsers, getUserById, updateUser, deleteUser } from './users.controller';
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { roleGuard } from '../../middleware/role.middleware';
+import { UserRoleEnum } from '../../enum/roles.enum';
 
 const router = Router();
 
@@ -9,7 +10,7 @@ const router = Router();
 router.use(authMiddleware);
 
 // GET /api/users - Solo admin y soporte pueden ver todos los usuarios
-router.get('/', roleGuard('admin', 'soporte'), getAllUsers);
+router.get('/', roleGuard(UserRoleEnum.ADMIN, UserRoleEnum.SOPORTE), getAllUsers);
 
 // GET /api/users/:id
 router.get('/:id', getUserById);

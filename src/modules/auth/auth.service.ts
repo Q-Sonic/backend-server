@@ -1,6 +1,7 @@
 import { getAuth, getFirestore, admin, initFirebase } from '../../config/firebase';
 import { UserRecord, UserRole, LoginResponse, RegisterResponse } from '../../types';
 import { getEnv } from '../../config/env';
+import { UserRoleEnum } from '../../enum/roles.enum';
 
 interface RegisterInput {
   email: string;
@@ -79,7 +80,7 @@ export class AuthService {
 
     // Obtenemos el usuario de Firestore para extraer el rol
     const userDoc = await this.db.collection('users').doc(data.localId).get();
-    const userRole = userDoc.exists ? (userDoc.data() as UserRecord).role : 'cliente';
+    const userRole = userDoc.exists ? (userDoc.data() as UserRecord).role : UserRoleEnum.CLIENTE;
 
     return {
       idToken: data.idToken,

@@ -6,6 +6,7 @@ import 'express-async-errors';
 import authRoutes from './modules/auth/auth.routes';
 import usersRoutes from './modules/users/users.routes';
 import storageRoutes from './modules/storage/storage.routes';
+import artistServicesRoutes from './modules/artist-services/artist-services.routes';
 import { errorMiddleware } from './middleware/error.middleware';
 import { sendSuccess } from './utils/response.util';
 import { setupSwagger } from './config/swagger';
@@ -27,6 +28,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/storage', storageRoutes);
+app.use('/api/artist-services', artistServicesRoutes);
 
 // ─── Swagger Docs ─────────────────────────────────────────────────────────────
 setupSwagger(app);

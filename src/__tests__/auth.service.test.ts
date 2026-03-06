@@ -1,5 +1,6 @@
 import { AuthService } from '../modules/auth/auth.service';
 import * as firebaseConfig from '../config/firebase';
+import { UserRoleEnum } from '../enum/roles.enum';
 
 // Mock the firebase config functions
 jest.mock('../config/firebase', () => ({
@@ -52,7 +53,7 @@ describe('AuthService — Unit Tests', () => {
             email: 'new@user.com',
             password: 'password123',
             displayName: 'New User',
-            role: 'cliente' as const,
+            role: UserRoleEnum.CLIENTE as const,
         };
 
         it('should throw an error if email is invalid', async () => {
@@ -70,7 +71,7 @@ describe('AuthService — Unit Tests', () => {
                 refreshToken: 'refresh123',
                 expiresIn: '3600',
                 uid: 'uid123',
-                role: 'cliente'
+                role: UserRoleEnum.CLIENTE
             });
 
             const result = await authService.register(input);

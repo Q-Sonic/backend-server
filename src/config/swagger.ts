@@ -112,6 +112,35 @@ const options: swaggerJsdoc.Options = {
                         expiresInMs: { type: 'number', example: 3600000 },
                     },
                 },
+                ArtistServiceRecord: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', example: 'docId123' },
+                        artistId: { type: 'string', example: 'artistUid' },
+                        name: { type: 'string', example: 'Concierto' },
+                        price: { type: 'number', example: 500 },
+                        description: { type: 'string', example: 'Show en vivo con banda completa' },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                },
+                CreateArtistServiceBody: {
+                    type: 'object',
+                    required: ['name', 'price'],
+                    properties: {
+                        name: { type: 'string', example: 'Concierto' },
+                        price: { type: 'number', example: 500 },
+                        description: { type: 'string', example: 'Show en vivo con banda completa' },
+                    },
+                },
+                UpdateArtistServiceBody: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string', example: 'Concierto' },
+                        price: { type: 'number', example: 600 },
+                        description: { type: 'string', example: 'Show en vivo' },
+                    },
+                },
             },
         },
         tags: [
@@ -119,6 +148,7 @@ const options: swaggerJsdoc.Options = {
             { name: 'Auth', description: 'Registro y perfil de usuario' },
             { name: 'Users', description: 'CRUD de usuarios (requiere auth)' },
             { name: 'Storage', description: 'Gestión de archivos en Firebase Storage' },
+            { name: 'Artist Services', description: 'CRUD de servicios/precios del artista (concierto, acústico, evento privado)' },
         ],
         paths: {
             '/health': {
@@ -355,6 +385,134 @@ const options: swaggerJsdoc.Options = {
                         '200': { description: 'URL firmada generada', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { type: 'object', properties: { url: { type: 'string' } } } } }] } } } },
                         '400': { description: 'filePath requerido', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                         '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/artist-services': {
+                get: {
+                    tags: ['Artist Services'],
+                    summary: 'Listar servicios del artista autenticado',
+                    description: 'Solo rol artista. Devuelve concierto, acústico, evento privado, etc.',
+                    security: [{ bearerAuth: [] }],
+                    responses: {
+                        '200': {
+                            description: 'Lista de servicios del artista',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { type: 'array', items: { $ref: '#/components/schemas/ArtistServiceRecord' } } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo artistas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+                post: {
+                    tags: ['Artist Services'],
+                    summary: 'Crear servicio (concierto, acústico, evento privado)',
+                    security: [{ bearerAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateArtistServiceBody' } } },
+                    },
+                    responses: {
+                        '201': {
+                            description: 'Servicio creado',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ArtistServiceRecord' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '400': { description: 'name y price requeridos', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo artistas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/artist-services/all/{artistId}': {
+                get: {
+                    tags: ['Artist Services'],
+                    summary: 'Listar todos los servicios de un artista',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'artistId', in: 'path', required: true, schema: { type: 'string' }, description: 'ID del artista' }],
+                    responses: {
+                        '200': { description: 'Lista de servicios del artista', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } } },
+                    },
+                },
+            },
+            '/artist-services/{id}': {
+                get: {
+                    tags: ['Artist Services'],
+                    summary: 'Obtener un servicio por ID',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'ID del servicio' }],
+                    responses: {
+                        '200': {
+                            description: 'Servicio encontrado',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ArtistServiceRecord' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo artistas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '404': { description: 'Servicio no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+                put: {
+                    tags: ['Artist Services'],
+                    summary: 'Actualizar servicio',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'ID del servicio' }],
+                    requestBody: {
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateArtistServiceBody' } } },
+                    },
+                    responses: {
+                        '200': {
+                            description: 'Servicio actualizado',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ArtistServiceRecord' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo artistas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '404': { description: 'Servicio no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+                delete: {
+                    tags: ['Artist Services'],
+                    summary: 'Eliminar servicio',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'ID del servicio' }],
+                    responses: {
+                        '200': { description: 'Servicio eliminado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } } },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo artistas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '404': { description: 'Servicio no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                     },
                 },
             },

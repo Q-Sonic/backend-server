@@ -1,5 +1,6 @@
 import request from 'supertest';
 import * as firebaseConfig from '../config/firebase';
+import { UserRoleEnum } from '../enum/roles.enum';
 
 // Mock global fetch for REST API calls
 global.fetch = jest.fn();
@@ -92,7 +93,7 @@ describe('Auth API — Integration Tests', () => {
                 email: 'test@example.com',
                 password: 'password123',
                 displayName: 'Test User',
-                role: 'cliente',
+                role: UserRoleEnum.CLIENTE,
             });
 
             expect(response.status).toBe(201);

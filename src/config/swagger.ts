@@ -573,7 +573,8 @@ const options: swaggerJsdoc.Options = {
             '/client-profiles/me': {
                 get: {
                     tags: ['Client Profile'],
-                    summary: 'Obtener perfil del cliente (US-6, US-7)',
+                    summary: 'Obtener mi perfil de cliente',
+                    description: 'Solo rol cliente.',
                     security: [{ bearerAuth: [] }],
                     responses: {
                         '200': {
@@ -595,13 +596,54 @@ const options: swaggerJsdoc.Options = {
                     },
                 },
             },
+            '/client-profiles/{id}': {
+                get: {
+                    tags: ['Client Profile'],
+                    summary: 'Obtener perfil de cliente por ID',
+                    description: 'Solo roles admin y soporte.',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'UID del cliente' }],
+                    responses: {
+                        '200': {
+                            description: 'Perfil del cliente',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ClientProfileRecord' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo admin/soporte', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '404': { description: 'Perfil no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
             '/client-profiles': {
                 put: {
                     tags: ['Client Profile'],
                     summary: 'Crear o actualizar perfil del cliente',
+                    description: 'Solo cliente. Acepta JSON o multipart/form-data con campo "photo" (archivo imagen); la imagen se sube a Firebase Storage.',
                     security: [{ bearerAuth: [] }],
                     requestBody: {
-                        content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateOrUpdateClientProfileBody' } } },
+                        content: {
+                            'application/json': { schema: { $ref: '#/components/schemas/CreateOrUpdateClientProfileBody' } },
+                            'multipart/form-data': {
+                                schema: {
+                                    type: 'object',
+                                    properties: {
+                                        photo: { type: 'string', format: 'binary', description: 'Imagen (jpeg, png, webp, gif)' },
+                                        name: { type: 'string' },
+                                        phone: { type: 'string' },
+                                        location: { type: 'string' },
+                                    },
+                                },
+                            },
+                        },
                     },
                     responses: {
                         '200': {
@@ -625,7 +667,8 @@ const options: swaggerJsdoc.Options = {
             '/artist-profiles/me': {
                 get: {
                     tags: ['Artist Profile'],
-                    summary: 'Obtener perfil del artista (US-10)',
+                    summary: 'Obtener mi perfil de artista',
+                    description: 'Solo rol artista.',
                     security: [{ bearerAuth: [] }],
                     responses: {
                         '200': {
@@ -647,13 +690,58 @@ const options: swaggerJsdoc.Options = {
                     },
                 },
             },
+            '/artist-profiles/{id}': {
+                get: {
+                    tags: ['Artist Profile'],
+                    summary: 'Obtener perfil de artista por ID',
+                    description: 'Cliente, admin y soporte: cualquier artista. Artista: solo el propio (id = uid).',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'UID del artista' }],
+                    responses: {
+                        '200': {
+                            description: 'Perfil del artista',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ArtistProfileRecord' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Sin permiso', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '404': { description: 'Perfil no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
             '/artist-profiles': {
                 put: {
                     tags: ['Artist Profile'],
                     summary: 'Crear o actualizar perfil del artista',
+                    description: 'Solo artista. Acepta JSON o multipart/form-data con campo "photo" (archivo imagen); la imagen se sube a Firebase Storage.',
                     security: [{ bearerAuth: [] }],
                     requestBody: {
-                        content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateOrUpdateArtistProfileBody' } } },
+                        content: {
+                            'application/json': { schema: { $ref: '#/components/schemas/CreateOrUpdateArtistProfileBody' } },
+                            'multipart/form-data': {
+                                schema: {
+                                    type: 'object',
+                                    properties: {
+                                        photo: { type: 'string', format: 'binary', description: 'Imagen (jpeg, png, webp, gif)' },
+                                        biography: { type: 'string' },
+                                        city: { type: 'string' },
+                                        instagram: { type: 'string' },
+                                        facebook: { type: 'string' },
+                                        twitter: { type: 'string' },
+                                        youtube: { type: 'string' },
+                                        tiktok: { type: 'string' },
+                                    },
+                                },
+                            },
+                        },
                     },
                     responses: {
                         '200': {

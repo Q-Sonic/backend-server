@@ -198,10 +198,10 @@ Elimina un servicio (solo si pertenece al artista).
 
 ## Client Profile (US-6, US-7 — Perfil de cliente) 🔒
 
-Solo usuarios con rol **cliente**. Colección `client_profiles` en Firestore (documento por `uid`).
+Colección `client_profiles` en Firestore (documento por `uid`). La foto se sube como archivo y se guarda en Firebase Storage.
 
-### `GET /client-profiles`
-Obtiene el perfil del cliente autenticado.
+### `GET /client-profiles/me`
+Obtiene el perfil del cliente autenticado. **Solo rol cliente.**
 
 **Response 200**
 ```json
@@ -212,25 +212,23 @@ Obtiene el perfil del cliente autenticado.
     "name": "Juan Pérez",
     "phone": "+34 600 000 000",
     "location": "Madrid, España",
-    "photo": "https://...",
+    "photo": "https://storage.googleapis.com/...",
     "createdAt": "...",
     "updatedAt": "..."
   }
 }
 ```
 
-### `PUT /client-profiles`
-Crea o actualiza el perfil del cliente. Todos los campos son opcionales.
+### `GET /client-profiles/:id`
+Obtiene el perfil de un cliente por su UID. **Solo roles admin y soporte.**
 
-**Body**
-```json
-{
-  "name": "Juan Pérez",
-  "phone": "+34 600 000 000",
-  "location": "Madrid, España",
-  "photo": "https://storage.../photo.jpg"
-}
-```
+### `PUT /client-profiles`
+Crea o actualiza el perfil del cliente. **Solo rol cliente.** Acepta **JSON** o **multipart/form-data**.
+
+- **JSON:** campos opcionales `name`, `phone`, `location`, `photo` (URL).
+- **Multipart:** campo `photo` = archivo de imagen (jpeg, png, webp, gif); se sube a Firebase Storage en `client_profiles/{uid}/` y se guarda la URL en el perfil. Opcionales: `name`, `phone`, `location` como campos de texto.
+
+**Body (JSON)** o **form-data:** `name`, `phone`, `location`, `photo` (archivo o URL).
 
 **Response 200**
 ```json
@@ -245,10 +243,10 @@ Crea o actualiza el perfil del cliente. Todos los campos son opcionales.
 
 ## Artist Profile (US-10 — Perfil público artista) 🔒
 
-Solo usuarios con rol **artista**. Colección `artist_profiles` en Firestore (documento por `uid`).
+Colección `artist_profiles` en Firestore (documento por `uid`). La foto se sube como archivo y se guarda en Firebase Storage.
 
-### `GET /artist-profiles`
-Obtiene el perfil del artista autenticado.
+### `GET /artist-profiles/me`
+Obtiene el perfil del artista autenticado. **Solo rol artista.**
 
 **Response 200**
 ```json
@@ -262,7 +260,7 @@ Obtiene el perfil del artista autenticado.
       "facebook": "https://facebook.com/...",
       "youtube": "https://youtube.com/..."
     },
-    "photo": "https://...",
+    "photo": "https://storage.googleapis.com/...",
     "city": "Barcelona",
     "createdAt": "...",
     "updatedAt": "..."
@@ -270,23 +268,16 @@ Obtiene el perfil del artista autenticado.
 }
 ```
 
-### `PUT /artist-profiles`
-Crea o actualiza el perfil del artista. Todos los campos son opcionales. `socialNetworks` se fusiona con los valores existentes.
+### `GET /artist-profiles/:id`
+Obtiene el perfil de un artista por su UID. **Roles:** cliente, admin y soporte (cualquier artista); artista (solo el propio perfil, `id` = su uid).
 
-**Body**
-```json
-{
-  "biography": "Biografía del artista...",
-  "socialNetworks": {
-    "instagram": "https://instagram.com/...",
-    "facebook": "https://facebook.com/...",
-    "youtube": "https://youtube.com/...",
-    "tiktok": "https://tiktok.com/..."
-  },
-  "photo": "https://storage.../photo.jpg",
-  "city": "Barcelona"
-}
-```
+### `PUT /artist-profiles`
+Crea o actualiza el perfil del artista. **Solo rol artista.** Acepta **JSON** o **multipart/form-data**.
+
+- **JSON:** campos opcionales `biography`, `socialNetworks`, `photo` (URL), `city`.
+- **Multipart:** campo `photo` = archivo de imagen (jpeg, png, webp, gif); se sube a Firebase Storage en `artist_profiles/{uid}/` y se guarda la URL. Opcionales: `biography`, `city`, `instagram`, `facebook`, `twitter`, `youtube`, `tiktok`.
+
+**Body (JSON)** o **form-data:** `biography`, `socialNetworks` (o redes por campo), `photo` (archivo o URL), `city`.
 
 **Response 200**
 ```json

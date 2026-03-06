@@ -1,6 +1,7 @@
 import { Request } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { UserRoleEnum } from '../enum/roles.enum';
+import { ContractStatus, PaymentStatus } from '../enum/contract.enum';
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 export type UserRole = UserRoleEnum.CLIENTE | UserRoleEnum.ARTISTA | UserRoleEnum.ORGANIZACION | UserRoleEnum.ADMIN | UserRoleEnum.SOPORTE;
@@ -109,4 +110,56 @@ export interface CreateOrUpdateArtistProfileInput {
     socialNetworks?: SocialNetworks;
     photo?: string;
     city?: string;
+}
+
+// ─── Contratos, Eventos y Pagos (US-8) ──────────────────────────────────────
+export interface EventDetails {
+    name: string;
+    date: FirebaseFirestore.Timestamp;
+    location: string;
+    description?: string;
+}
+
+export interface PaymentItem {
+    amount: number;
+    date: FirebaseFirestore.Timestamp;
+    reference?: string;
+    method?: string;
+}
+
+export interface ContractFinancials {
+    totalAmount: number;
+    paidAmount: number;
+    paymentStatus: PaymentStatus;
+}
+
+export interface ContractRecord {
+    id: string;
+    clientId: string;
+    artistId: string;
+    serviceId: string;
+    status: ContractStatus;
+    eventDetails: EventDetails;
+    financials: ContractFinancials;
+    payments: PaymentItem[];
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export interface CreateContractInput {
+    artistId: string;
+    serviceId: string;
+    eventDetails: {
+        name: string;
+        date: string | number | Date;
+        location: string;
+        description?: string;
+    };
+    totalAmount: number;
+}
+
+export interface AddPaymentInput {
+    amount: number;
+    reference?: string;
+    method?: string;
 }

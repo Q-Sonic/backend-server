@@ -104,6 +104,14 @@ const options: swaggerJsdoc.Options = {
                         filePath: { type: 'string', example: 'uploads/1234_song.mp3' },
                     },
                 },
+                DeleteStorageBody: {
+                    type: 'object',
+                    description: 'Pass the file URL (recommended) or the path in the bucket',
+                    properties: {
+                        url: { type: 'string', example: 'https://storage.googleapis.com/your-bucket/client_profiles/uid/photo_123.jpg', description: 'Full Storage URL to delete' },
+                        filePath: { type: 'string', example: 'uploads/1234_song.mp3', description: 'Path in bucket (alternative)' },
+                    },
+                },
                 SignedUrlBody: {
                     type: 'object',
                     required: ['filePath'],
@@ -413,15 +421,16 @@ const options: swaggerJsdoc.Options = {
             '/storage/delete': {
                 delete: {
                     tags: ['Storage'],
-                    summary: 'Eliminar archivo de Firebase Storage',
+                    summary: 'Eliminar archivo por URL o path',
+                    description: 'Envía la URL del archivo en Storage (recomendado) o el filePath. La URL debe ser del bucket del proyecto.',
                     security: [{ bearerAuth: [] }],
                     requestBody: {
                         required: true,
-                        content: { 'application/json': { schema: { $ref: '#/components/schemas/FilePathBody' } } },
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/DeleteStorageBody' } } },
                     },
                     responses: {
                         '200': { description: 'Archivo eliminado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiResponse' } } } },
-                        '400': { description: 'filePath requerido', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '400': { description: 'url o filePath requerido; o URL inválida/externa', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                         '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                     },
                 },

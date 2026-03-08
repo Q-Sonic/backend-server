@@ -4,9 +4,13 @@ import { getMyProfile, getArtistProfileById, createOrUpdateProfile } from './art
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { roleGuard } from '../../middleware/role.middleware';
 import { UserRoleEnum } from '../../enum/roles.enum';
+import { MAX_IMAGE_SIZE } from '../../helper/storage';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_IMAGE_SIZE },
+});
 
 router.use(authMiddleware);
 

@@ -1,14 +1,15 @@
 import { Response } from 'express';
 import { ClientProfilesService } from './client-profiles.service';
 import { StorageService } from '../storage/storage.service';
+import { extractFilePathFromStorageUrl } from '../../helper/storage';
 import { AuthRequest } from '../../types';
 import { sendSuccess, sendNotFound, sendError, sendForbidden } from '../../utils/response.util';
-import { CreateOrUpdateClientProfileInput } from '../../types';
 
 const clientProfilesService = new ClientProfilesService();
 const storageService = new StorageService();
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 MB
 
 function getUid(req: AuthRequest): string {
     const uid = req.user?.uid;
@@ -67,6 +68,21 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
             if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) {
                 sendError({ res, error: 'Photo must be an image (jpeg, png, webp, gif)', statusCode: 400 });
                 return;
+            }
+            if (req.file.size > MAX_PHOTO_SIZE) {
+                sendError({ res, error: 'Photo too large. Maximum size is 5 MB', statusCode: 400 });
+                return;
+            }
+            const existing = await clientProfilesService.getByUid(uid);
+            if (existing?.photo) {
+                const oldPath = extractFilePathFromStorageUrl(existing.photo);
+                if (oldPath) {
+                    try {
+                        await storageService.deleteFile(oldPath);
+                    } catch {
+                        // ignore: file may already be deleted
+                    }
+                }
             }
             const ext = req.file.originalname.split('.').pop() || 'jpg';
             const fileName = `photo_${Date.now()}.${ext}`;

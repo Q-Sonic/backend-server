@@ -320,14 +320,18 @@ Crea o actualiza el perfil del artista. **Solo rol artista.** Acepta **JSON** o 
 
 ## Storage
 
+Los archivos (audio, video, imágenes) se guardan en Firebase Storage. La variable de entorno `FIREBASE_STORAGE_BUCKET` debe coincidir con el nombre del bucket en Firebase Console → Storage: `{projectId}.appspot.com` o `{projectId}.firebasestorage.app` (proyectos recientes). No incluir `gs://`.
+
+**Límites de tamaño:** imágenes 5 MB, videos 50MB, audio 10 MB. Fotos de perfil (cliente/artista): máx. 5 MB. Al actualizar la foto de perfil, la imagen anterior se elimina del Storage automáticamente.
+
 ### `POST /storage/upload` 🔒
-Sube un archivo a Firebase Storage.
+Sube un archivo a Firebase Storage (multimedia: audio, video, imágenes).
 
 **Content-Type**: `multipart/form-data`
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `file` | File | Archivo a subir |
+| `file` | File | Archivo a subir (imagen ≤5 MB, video ≤50 MB, audio ≤10 MB) |
 | `folder` | string (opcional) | Carpeta destino (default: `uploads`) |
 
 **Response 201**
@@ -340,12 +344,13 @@ Sube un archivo a Firebase Storage.
 ```
 
 ### `DELETE /storage/delete` 🔒
-Elimina un archivo.
+Elimina un archivo por su URL de Storage o por path. La URL debe ser del bucket del proyecto (p. ej. `https://storage.googleapis.com/tu-bucket/carpeta/archivo.jpg`).
 
 **Body**
 ```json
-{ "filePath": "uploads/1234_song.mp3" }
+{ "url": "https://storage.googleapis.com/tu-bucket/client_profiles/uid/photo_123.jpg" }
 ```
+O por path (compatibilidad): `{ "filePath": "uploads/1234_song.mp3" }`
 
 ### `POST /storage/signed-url` 🔒
 Genera una URL firmada temporal.

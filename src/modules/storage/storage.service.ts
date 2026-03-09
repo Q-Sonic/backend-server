@@ -1,11 +1,8 @@
-import { getStorage, admin } from '../../config/firebase';
-import { getEnv } from '../../config/env';
+import { getStorageBucket } from '../../helper/storage';
 
 export class StorageService {
-    private bucket: any; // bucket type from @google-cloud/storage
-
-    constructor() {
-        this.bucket = getStorage().bucket(getEnv().FIREBASE_STORAGE_BUCKET);
+    private get bucket() {
+        return getStorageBucket();
     }
 
     async uploadFile(
@@ -20,8 +17,8 @@ export class StorageService {
 
         await file.save(fileBuffer, {
             metadata: { contentType: mimeType },
-            public: true,
         });
+        await file.makePublic();
 
         const publicUrl = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
         return publicUrl;

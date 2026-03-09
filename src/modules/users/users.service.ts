@@ -1,5 +1,6 @@
 import { getFirestore, admin } from '../../config/firebase';
 import { UserRecord } from '../../types';
+import { UserRoleEnum } from '../../enum/roles.enum';
 
 export class UsersService {
     private db: admin.firestore.Firestore;
@@ -38,5 +39,31 @@ export class UsersService {
         await this.db.collection('users').doc(uid).delete();
         // También elimina de Firebase Auth
         await admin.auth().deleteUser(uid);
+    }
+
+    async createArtist(email: string, password: string, displayName: string): Promise<UserRecord> {
+        // 1. Crea el usuario en Firebase Auth usando el SDK de Admin
+        const firebaseUser = await admin.auth().createUser({
+            email,
+            password,
+            displayName,
+        });
+
+        // 2. Asigna el rol mediante Firebase Custom Claims
+        await admin.auth().setCustomUserClaims(firebaseUser.uid, { role: UserRoleEnum.ARTISTA });
+
+        // 3. Guarda el perfil en Firestore
+        const now = admin.firestore.Timestamp.now();
+        const userRecord: UserRecord = {
+            uid: firebaseUser.uid,
+            email,
+            displayName,
+            role: UserRoleEnum.ARTISTA,
+            createdAt: now,
+            updatedAt: now,
+        };
+
+        await this.db.collection('users').doc(firebaseUser.uid).set(userRecord);
+        return userRecord;
     }
 }

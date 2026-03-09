@@ -127,6 +127,34 @@ Actualiza datos del usuario.
 ### `DELETE /users/:id` 🔒
 Elimina el usuario de Firestore y Firebase Auth.
 
+### `POST /users/artists` 🔒
+Crea un nuevo perfil de artista. **Solo rol admin.**
+
+**Body**
+```json
+{
+  "email": "artista@example.com",
+  "password": "securePassword123",
+  "displayName": "Nombre Artístico"
+}
+```
+
+**Response 201**
+```json
+{
+  "success": true,
+  "data": {
+    "uid": "...",
+    "email": "artista@example.com",
+    "displayName": "Nombre Artístico",
+    "role": "artista",
+    "createdAt": "...",
+    "updatedAt": "..."
+  },
+  "message": "Artist account created successfully"
+}
+```
+
 ---
 
 ## Artist Services (US-3 — Precios del artista) 🔒
@@ -340,6 +368,69 @@ Genera una URL firmada temporal.
 {
   "success": true,
   "data": { "url": "https://storage.googleapis.com/...?X-Goog-Signature=..." }
+}
+```
+
+---
+
+## Contracts (US-8 — Historial de contratos y eventos) 🔒
+
+### `GET /contracts/my-history`
+Obtiene el historial de contratos y eventos del cliente autenticado. **Solo rol cliente.**
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "contractId",
+      "clientId": "...",
+      "artistId": "...",
+      "status": "pending",
+      "eventDetails": {
+        "name": "Boda Juan y Ana",
+        "date": "...",
+        "location": "...",
+        "description": "..."
+      },
+      "financials": {
+        "totalAmount": 1000,
+        "paidAmount": 0,
+        "paymentStatus": "unpaid"
+      },
+      "payments": []
+    }
+  ],
+  "message": "Contracts history retrieved"
+}
+```
+
+### `GET /contracts/:id`
+Obtiene el detalle de un contrato. **Solo cliente o artista involucrado.**
+
+### `POST /contracts`
+Crea una nueva solicitud de contrato (Booking). **Solo rol cliente.**
+
+### `PATCH /contracts/:id/status`
+Actualiza el estado del contrato.
+- **Artista:** puede poner `accepted`, `rejected`, `completed`.
+- **Cliente:** puede poner `cancelled`.
+
+**Body**
+```json
+{ "status": "accepted" }
+```
+
+### `POST /contracts/:id/payments`
+Registra un nuevo pago. **Solo rol artista.**
+
+**Body**
+```json
+{
+  "amount": 500,
+  "method": "transfer",
+  "reference": "REF123"
 }
 ```
 

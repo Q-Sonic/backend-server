@@ -201,6 +201,82 @@ const options: swaggerJsdoc.Options = {
                         city: { type: 'string' },
                     },
                 },
+                EventDetails: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string', example: 'Boda de Juan y Ana' },
+                        date: { type: 'string', format: 'date-time', description: 'Fecha del evento' },
+                        location: { type: 'string', example: 'Hacienda El Retiro, Madrid' },
+                        description: { type: 'string', example: 'Evento privado, traer equipo de sonido' },
+                    },
+                },
+                PaymentItem: {
+                    type: 'object',
+                    properties: {
+                        amount: { type: 'number', example: 250 },
+                        date: { type: 'string', format: 'date-time' },
+                        reference: { type: 'string', example: 'Transferencia 12345' },
+                        method: { type: 'string', example: 'transfer' },
+                    },
+                },
+                ContractFinancials: {
+                    type: 'object',
+                    properties: {
+                        totalAmount: { type: 'number', example: 500 },
+                        paidAmount: { type: 'number', example: 250 },
+                        paymentStatus: { type: 'string', enum: ['unpaid', 'partial', 'paid'], example: 'partial' },
+                    },
+                },
+                ContractRecord: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string' },
+                        clientId: { type: 'string' },
+                        artistId: { type: 'string' },
+                        serviceId: { type: 'string' },
+                        status: { type: 'string', enum: ['pending', 'accepted', 'rejected', 'completed', 'cancelled'], example: 'pending' },
+                        eventDetails: { $ref: '#/components/schemas/EventDetails' },
+                        financials: { $ref: '#/components/schemas/ContractFinancials' },
+                        payments: { type: 'array', items: { $ref: '#/components/schemas/PaymentItem' } },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                },
+                CreateContractBody: {
+                    type: 'object',
+                    required: ['artistId', 'serviceId', 'eventDetails', 'totalAmount'],
+                    properties: {
+                        artistId: { type: 'string', example: 'artist_uid_123' },
+                        serviceId: { type: 'string', example: 'service_id_456' },
+                        eventDetails: {
+                            type: 'object',
+                            required: ['name', 'date', 'location'],
+                            properties: {
+                                name: { type: 'string', example: 'Concierto Aniversario' },
+                                date: { type: 'string', format: 'date', example: '2026-06-15' },
+                                location: { type: 'string', example: 'Teatro Principal' },
+                                description: { type: 'string' },
+                            },
+                        },
+                        totalAmount: { type: 'number', example: 1000 },
+                    },
+                },
+                UpdateContractStatusBody: {
+                    type: 'object',
+                    required: ['status'],
+                    properties: {
+                        status: { type: 'string', enum: ['accepted', 'rejected', 'completed', 'cancelled'], example: 'accepted' },
+                    },
+                },
+                AddPaymentBody: {
+                    type: 'object',
+                    required: ['amount'],
+                    properties: {
+                        amount: { type: 'number', example: 500 },
+                        reference: { type: 'string', example: 'Pago en efectivo' },
+                        method: { type: 'string', example: 'cash' },
+                    },
+                },
             },
         },
         tags: [
@@ -211,6 +287,7 @@ const options: swaggerJsdoc.Options = {
             { name: 'Artist Services', description: 'CRUD de servicios/precios del artista (concierto, acústico, evento privado)' },
             { name: 'Client Profile', description: 'Perfil de cliente (US-6, US-7)' },
             { name: 'Artist Profile', description: 'Perfil público del artista (US-10)' },
+            { name: 'Contracts', description: 'Gestión de contratos, eventos y pagos (US-8, US-5)' },
         ],
         paths: {
             '/health': {
@@ -768,6 +845,100 @@ const options: swaggerJsdoc.Options = {
                         },
                         '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                         '403': { description: 'Solo artistas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/contracts/my-history': {
+                get: {
+                    tags: ['Contracts'],
+                    summary: 'Listar historial de contratos y eventos del cliente',
+                    description: 'Solo rol cliente. Retorna todos los contratos donde el usuario es el cliente.',
+                    security: [{ bearerAuth: [] }],
+                    responses: {
+                        '200': {
+                            description: 'Historial de contratos',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { type: 'array', items: { $ref: '#/components/schemas/ContractRecord' } } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'Solo clientes', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/contracts': {
+                post: {
+                    tags: ['Contracts'],
+                    summary: 'Crear un nuevo contrato/reserva',
+                    description: 'Solo rol cliente. Inicia un contrato en estado "pending".',
+                    security: [{ bearerAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateContractBody' } } },
+                    },
+                    responses: {
+                        '201': {
+                            description: 'Contrato creado',
+                            content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/ContractRecord' } } }] } } },
+                        },
+                        '400': { description: 'Faltan campos requeridos', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/contracts/{id}': {
+                get: {
+                    tags: ['Contracts'],
+                    summary: 'Obtener detalle de un contrato específico',
+                    description: 'Solo accesible por el cliente o el artista involucrados.',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'ID del contrato' }],
+                    responses: {
+                        '200': { description: 'Contrato encontrado', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/ContractRecord' } } }] } } } },
+                        '403': { description: 'Acceso denegado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '404': { description: 'No encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/contracts/{id}/status': {
+                patch: {
+                    tags: ['Contracts'],
+                    summary: 'Actualizar estado del contrato',
+                    description: 'Artista puede aceptar/rechazar/completar. Cliente puede cancelar.',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'ID del contrato' }],
+                    requestBody: {
+                        required: true,
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateContractStatusBody' } } },
+                    },
+                    responses: {
+                        '200': { description: 'Estado actualizado', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/ContractRecord' } } }] } } } },
+                        '400': { description: 'Status requerido', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                        '403': { description: 'No autorizado para este cambio', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/contracts/{id}/payments': {
+                post: {
+                    tags: ['Contracts'],
+                    summary: 'Registrar un pago para el contrato',
+                    description: 'Solo el artista o admin puede registrar pagos recibidos.',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'ID del contrato' }],
+                    requestBody: {
+                        required: true,
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/AddPaymentBody' } } },
+                    },
+                    responses: {
+                        '200': { description: 'Pago registrado', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/ContractRecord' } } }] } } } },
+                        '403': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                     },
                 },
             },

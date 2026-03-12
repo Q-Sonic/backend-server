@@ -78,9 +78,9 @@ export class AuthService {
       throw new Error(`Credenciales inválidas: ${errorMsg}`);
     }
 
-    // Obtenemos el usuario de Firestore para extraer el rol
+    // Rol desde Firestore (fuente de verdad). El JWT no incluye custom claims hasta el próximo login/refresh.
     const userDoc = await this.db.collection('users').doc(data.localId).get();
-    const userRole = userDoc.exists ? (userDoc.data() as UserRecord).role : UserRoleEnum.CLIENTE;
+    const userRole = userDoc.exists ? (userDoc.data() as { role?: string })?.role as UserRole : UserRoleEnum.CLIENTE;
 
     return {
       idToken: data.idToken,

@@ -1,13 +1,15 @@
 import { Response } from 'express';
 import { ArtistProfilesService } from './artist-profiles.service';
 import { StorageService } from '../storage/storage.service';
+import { UsersService } from '../users/users.service';
 import { extractFilePathFromStorageUrl } from '../../helper/storage';
-import { AuthRequest } from '../../types';
+import { AuthRequest, ArtistProfileMediaItem } from '../../types';
 import { sendSuccess, sendNotFound, sendError, sendForbidden } from '../../utils/response.util';
 import { UserRoleEnum } from '../../enum/roles.enum';
 
 const artistProfilesService = new ArtistProfilesService();
 const storageService = new StorageService();
+const usersService = new UsersService();
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -16,6 +18,26 @@ function getUid(req: AuthRequest): string {
     const uid = req.user?.uid;
     if (!uid) throw new Error('Unauthorized');
     return uid;
+}
+
+/** GET list: all artist profiles with displayName (cliente, admin, organizacion, soporte) */
+export async function listArtistProfiles(req: AuthRequest, res: Response): Promise<void> {
+    try {
+        const profiles = await artistProfilesService.listAll();
+        const uids = profiles.map((p) => p.uid);
+        const displayNames = await usersService.getDisplayNamesByUids(uids);
+        const list = profiles.map((p) => ({
+            ...p,
+            displayName: displayNames[p.uid] ?? '',
+        }));
+        sendSuccess(res, list);
+    } catch (err) {
+        sendError({
+            res,
+            error: err instanceof Error ? err.message : 'Failed to list artist profiles',
+            statusCode: 500,
+        });
+    }
 }
 
 /** GET by ID: artist (only own), client, admin, soporte (any artist) */
@@ -76,10 +98,42 @@ function parseSocialNetworks(body: Record<string, unknown>): Record<string, stri
     return Object.keys(out).length ? out : undefined;
 }
 
+function parseMedia(value: unknown): ArtistProfileMediaItem[] | undefined {
+    if (!Array.isArray(value)) return undefined;
+    const allowed: ArtistProfileMediaItem['type'][] = ['image', 'audio', 'video'];
+    const out: ArtistProfileMediaItem[] = [];
+    for (const item of value) {
+        if (item && typeof item === 'object' && typeof (item as Record<string, unknown>).url === 'string') {
+            const raw = item as Record<string, unknown>;
+            const type = allowed.includes((raw.type as ArtistProfileMediaItem['type']) ?? '') ? (raw.type as ArtistProfileMediaItem['type']) : 'image';
+            out.push({
+                url: String(raw.url),
+                type,
+                name: typeof raw.name === 'string' ? raw.name : undefined,
+            });
+        }
+    }
+    return out;
+}
+
 export async function createOrUpdateProfile(req: AuthRequest, res: Response): Promise<void> {
     try {
         const uid = getUid(req);
         const body = req.body as Record<string, unknown>;
+        if (typeof body.socialNetworks === 'string') {
+            try {
+                body.socialNetworks = JSON.parse(body.socialNetworks as string) as Record<string, string>;
+            } catch {
+                body.socialNetworks = undefined;
+            }
+        }
+        if (typeof body.media === 'string') {
+            try {
+                body.media = JSON.parse(body.media as string) as unknown;
+            } catch {
+                body.media = undefined;
+            }
+        }
         let photoUrl = typeof body.photo === 'string' ? body.photo : undefined;
 
         if (req.file) {
@@ -112,11 +166,14 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
             );
         }
 
+        const media = parseMedia(body.media);
+
         const profile = await artistProfilesService.createOrUpdate(uid, {
             biography: typeof body.biography === 'string' ? body.biography : undefined,
             socialNetworks: parseSocialNetworks(body),
             photo: photoUrl,
             city: typeof body.city === 'string' ? body.city : undefined,
+            media,
         });
         sendSuccess(res, profile, 'Profile saved');
     } catch (err) {

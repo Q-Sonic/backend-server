@@ -22,6 +22,12 @@ export class ArtistProfilesService {
         return { uid: doc.id, ...doc.data() } as ArtistProfileRecord;
     }
 
+    /** List all artist profiles (for client/admin browse). */
+    async listAll(): Promise<ArtistProfileRecord[]> {
+        const snapshot = await this.db.collection(COLLECTION).get();
+        return snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() } as ArtistProfileRecord));
+    }
+
     async createOrUpdate(
         uid: string,
         input: CreateOrUpdateArtistProfileInput
@@ -36,11 +42,14 @@ export class ArtistProfilesService {
             ...(input.socialNetworks ?? {}),
         };
 
+        const media = input.media !== undefined ? input.media : existing?.media;
+
         const data = {
             biography: (input.biography ?? existing?.biography ?? '').trim(),
             socialNetworks,
             photo: (input.photo ?? existing?.photo ?? '').trim(),
             city: (input.city ?? existing?.city ?? '').trim(),
+            ...(media !== undefined && { media }),
             updatedAt: now,
         };
 

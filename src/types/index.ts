@@ -95,12 +95,21 @@ export interface SocialNetworks {
     tiktok?: string;
 }
 
+/** Single media item in artist gallery (image, audio, video). */
+export interface ArtistProfileMediaItem {
+    url: string;
+    type: 'image' | 'audio' | 'video';
+    name?: string;
+}
+
 export interface ArtistProfileRecord {
     uid: string;
     biography: string;
     socialNetworks: SocialNetworks;
     photo: string;
     city: string;
+    /** Gallery media URLs (images, audio, video). */
+    media?: ArtistProfileMediaItem[];
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -110,6 +119,7 @@ export interface CreateOrUpdateArtistProfileInput {
     socialNetworks?: SocialNetworks;
     photo?: string;
     city?: string;
+    media?: ArtistProfileMediaItem[];
 }
 
 // ─── Contratos, Eventos y Pagos (US-8) ──────────────────────────────────────

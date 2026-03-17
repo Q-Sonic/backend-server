@@ -59,6 +59,7 @@ export class UsersService {
             email,
             displayName,
             role: UserRoleEnum.ARTISTA,
+            emailVerified: false,
             createdAt: now,
             updatedAt: now,
         };

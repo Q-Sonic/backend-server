@@ -23,6 +23,7 @@ export interface UserRecord {
     displayName: string;
     role: UserRole;
     photoURL?: string;
+    emailVerified: boolean; // false al registrarse, true al verificar
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -47,6 +48,33 @@ export interface LoginResponse {
 // ─── Respuesta de Registro (incluye tokens para login automático) ───────────
 export interface RegisterResponse extends LoginResponse {
     user: UserRecord;
+    verification?: {
+        code?: string;
+        expiresAt: Date | string;
+        message: string;
+    };
+}
+
+// ─── Respuesta de Login con Google OAuth ─────────────────────────────────────
+// El `customToken` es firmado por el servidor (Admin SDK).
+// El cliente debe usar: signInWithCustomToken(firebaseClientAuth, customToken)
+// para obtener un idToken de sesión con los custom claims del usuario.
+export interface GoogleLoginResponse {
+    customToken: string;
+    uid: string;
+    role: UserRole;
+    isNewUser: boolean;
+    user: UserRecord;
+}
+
+// ─── Verificación de Email ───────────────────────────────────────────────────
+export interface EmailVerificationRecord {
+    uid: string;
+    email: string;
+    code: string;
+    expiresAt: FirebaseFirestore.Timestamp;
+    verified: boolean;
+    createdAt: FirebaseFirestore.Timestamp;
 }
 
 // ─── Servicio del artista (tipo de espectáculo con precio) ──────────────────
@@ -162,4 +190,13 @@ export interface AddPaymentInput {
     amount: number;
     reference?: string;
     method?: string;
+}
+
+// ─── Recobrar Contraseña ─────────────────────────────────────────────────────
+export interface PasswordResetRecord {
+    email: string;
+    code: string;
+    expiresAt: FirebaseFirestore.Timestamp;
+    verified: boolean;
+    createdAt: FirebaseFirestore.Timestamp;
 }

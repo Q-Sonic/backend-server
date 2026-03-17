@@ -52,6 +52,7 @@ const options: swaggerJsdoc.Options = {
                         displayName: { type: 'string', example: 'John Doe' },
                         role: { type: 'string', example: 'cliente' },
                         photoURL: { type: 'string', example: 'https://...' },
+                        emailVerified: { type: 'boolean', example: false },
                         createdAt: { type: 'string', example: '2026-01-01T00:00:00Z' },
                         updatedAt: { type: 'string', example: '2026-01-01T00:00:00Z' },
                     },
@@ -82,6 +83,74 @@ const options: swaggerJsdoc.Options = {
                         expiresIn: { type: 'string', example: '3600' },
                         uid: { type: 'string', example: 'abc123uid' },
                         role: { type: 'string', example: 'cliente' },
+                    },
+                },
+                RegisterResponse: {
+                    type: 'object',
+                    properties: {
+                        idToken: { type: 'string', example: 'eyJhbGci...' },
+                        refreshToken: { type: 'string', example: 'AE82...' },
+                        expiresIn: { type: 'string', example: '3600' },
+                        uid: { type: 'string', example: 'abc123uid' },
+                        role: { type: 'string', example: 'cliente' },
+                        user: { $ref: '#/components/schemas/UserRecord' },
+                        verification: {
+                            type: 'object',
+                            properties: {
+                                code: { type: 'string', example: '123456' },
+                                expiresAt: { type: 'string', example: '2026-03-17T22:30:00Z' },
+                                message: { type: 'string', example: 'DEV MODE: El código se devuelve aquí...' },
+                            },
+                        },
+                    },
+                },
+                GoogleLoginBody: {
+                    type: 'object',
+                    required: ['idToken'],
+                    properties: {
+                        idToken: { type: 'string', description: 'ID Token de Google obtenido vía Firebase Client SDK' },
+                    },
+                },
+                GoogleLoginResponse: {
+                    type: 'object',
+                    properties: {
+                        customToken: { type: 'string', example: 'eyJhbGci...' },
+                        uid: { type: 'string', example: 'abc123uid' },
+                        role: { type: 'string', example: 'cliente' },
+                        isNewUser: { type: 'boolean', example: false },
+                        user: { $ref: '#/components/schemas/UserRecord' },
+                    },
+                },
+                VerifyEmailBody: {
+                    type: 'object',
+                    required: ['uid', 'code'],
+                    properties: {
+                        uid: { type: 'string', example: 'abc123uid' },
+                        code: { type: 'string', example: '123456' },
+                    },
+                },
+                ForgotPasswordBody: {
+                    type: 'object',
+                    required: ['email'],
+                    properties: {
+                        email: { type: 'string', format: 'email', example: 'user@example.com' },
+                    },
+                },
+                VerifyResetCodeBody: {
+                    type: 'object',
+                    required: ['email', 'code'],
+                    properties: {
+                        email: { type: 'string', format: 'email', example: 'user@example.com' },
+                        code: { type: 'string', example: '123456' },
+                    },
+                },
+                ResetPasswordBody: {
+                    type: 'object',
+                    required: ['email', 'code', 'newPassword'],
+                    properties: {
+                        email: { type: 'string', format: 'email', example: 'user@example.com' },
+                        code: { type: 'string', example: '123456' },
+                        newPassword: { type: 'string', minLength: 6, example: 'newSecurePass123' },
                     },
                 },
                 UpdateUserBody: {
@@ -341,7 +410,7 @@ const options: swaggerJsdoc.Options = {
                                     schema: {
                                         allOf: [
                                             { $ref: '#/components/schemas/ApiResponse' },
-                                            { properties: { data: { $ref: '#/components/schemas/UserRecord' } } },
+                                            { properties: { data: { $ref: '#/components/schemas/RegisterResponse' } } },
                                         ],
                                     },
                                 },
@@ -379,6 +448,107 @@ const options: swaggerJsdoc.Options = {
                         },
                         '400': { description: 'Faltan credenciales', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                         '401': { description: 'Credenciales inválidas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/auth/google': {
+                post: {
+                    tags: ['Auth'],
+                    summary: 'Registro / Login con Google OAuth',
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/GoogleLoginBody' },
+                            },
+                        },
+                    },
+                    responses: {
+                        '200': {
+                            description: 'Login exitoso',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/GoogleLoginResponse' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '401': { description: 'Token de Google inválido', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/auth/verify-email': {
+                post: {
+                    tags: ['Auth'],
+                    summary: 'Verificar email con código de 6 dígitos (STUB)',
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/VerifyEmailBody' },
+                            },
+                        },
+                    },
+                    responses: {
+                        '501': { description: 'Lógica no implementada aún' },
+                    },
+                },
+            },
+            '/auth/forgot-password': {
+                post: {
+                    tags: ['Auth'],
+                    summary: 'Solicitar código de recuperación de contraseña',
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/ForgotPasswordBody' },
+                            },
+                        },
+                    },
+                    responses: {
+                        '200': { description: 'Código generado' },
+                        '400': { description: 'Email no encontrado' },
+                    },
+                },
+            },
+            '/auth/verify-reset-code': {
+                post: {
+                    tags: ['Auth'],
+                    summary: 'Validar código de recuperación',
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/VerifyResetCodeBody' },
+                            },
+                        },
+                    },
+                    responses: {
+                        '200': { description: 'Código verificado' },
+                        '400': { description: 'Código inválido o expirado' },
+                    },
+                },
+            },
+            '/auth/reset-password': {
+                post: {
+                    tags: ['Auth'],
+                    summary: 'Establecer nueva contraseña',
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/ResetPasswordBody' },
+                            },
+                        },
+                    },
+                    responses: {
+                        '200': { description: 'Contraseña actualizada' },
+                        '400': { description: 'Error al actualizar contraseña' },
                     },
                 },
             },

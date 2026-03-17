@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getMyProfile, getArtistProfileById, createOrUpdateProfile } from './artist-profiles.controller';
+import { getMyProfile, listArtistProfiles, getArtistProfileById, createOrUpdateProfile } from './artist-profiles.controller';
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { roleGuard } from '../../middleware/role.middleware';
 import { UserRoleEnum } from '../../enum/roles.enum';
@@ -16,6 +16,9 @@ router.use(authMiddleware);
 
 // GET /api/artist-profiles/me — my profile (artista only)
 router.get('/me', roleGuard(UserRoleEnum.ARTISTA), getMyProfile);
+
+// GET /api/artist-profiles — list all (cliente, admin, organizacion, soporte)
+router.get('/', roleGuard(UserRoleEnum.CLIENTE, UserRoleEnum.ADMIN, UserRoleEnum.ORGANIZACION, UserRoleEnum.SOPORTE), listArtistProfiles);
 
 // GET /api/artist-profiles/:id — by id (artista own only; client, admin, soporte any)
 router.get('/:id', roleGuard(UserRoleEnum.ARTISTA, UserRoleEnum.CLIENTE, UserRoleEnum.ADMIN, UserRoleEnum.SOPORTE), getArtistProfileById);

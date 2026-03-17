@@ -1,5 +1,5 @@
-import { getFirestore, admin } from '../../config/firebase';
-import { UserRecord } from '../../types';
+import { getFirestore, getAuth, admin } from '../../config/firebase';
+import { UserRecord, UserRole } from '../../types';
 import { UserRoleEnum } from '../../enum/roles.enum';
 
 export class UsersService {
@@ -20,6 +20,21 @@ export class UsersService {
         return doc.data() as UserRecord;
     }
 
+    /** Get display names for many uids (for list enrichment). Missing users yield empty string. */
+    async getDisplayNamesByUids(uids: string[]): Promise<Record<string, string>> {
+        const out: Record<string, string> = {};
+        if (uids.length === 0) return out;
+        const uniq = [...new Set(uids)];
+        await Promise.all(
+            uniq.map(async (uid) => {
+                const doc = await this.db.collection('users').doc(uid).get();
+                const data = doc.exists ? (doc.data() as UserRecord) : null;
+                out[uid] = data?.displayName?.trim() ?? '';
+            })
+        );
+        return out;
+    }
+
     async update(uid: string, data: Partial<Omit<UserRecord, 'uid' | 'createdAt'>>): Promise<UserRecord> {
         const ref = this.db.collection('users').doc(uid);
         const doc = await ref.get();
@@ -27,6 +42,10 @@ export class UsersService {
 
         const updated = { ...data, updatedAt: admin.firestore.Timestamp.now() };
         await ref.update(updated);
+
+        if (data.role != null) {
+            await getAuth().setCustomUserClaims(uid, { role: data.role as UserRole });
+        }
 
         const updatedDoc = await ref.get();
         return updatedDoc.data() as UserRecord;

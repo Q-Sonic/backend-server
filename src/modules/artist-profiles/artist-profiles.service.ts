@@ -3,7 +3,9 @@ import {
     ArtistProfileRecord,
     CreateOrUpdateArtistProfileInput,
     SocialNetworks,
+    ArtistAvailability,
 } from '../../types';
+import { ContractStatus } from '../../enum/contract.enum';
 
 const COLLECTION = 'artist_profiles';
 
@@ -43,6 +45,8 @@ export class ArtistProfilesService {
         };
 
         const media = input.media !== undefined ? input.media : existing?.media;
+        const blockedDates = input.blockedDates !== undefined ? input.blockedDates : existing?.blockedDates;
+        const featuredSong = input.featuredSong !== undefined ? input.featuredSong : existing?.featuredSong;
 
         const data = {
             biography: (input.biography ?? existing?.biography ?? '').trim(),
@@ -50,6 +54,8 @@ export class ArtistProfilesService {
             photo: (input.photo ?? existing?.photo ?? '').trim(),
             city: (input.city ?? existing?.city ?? '').trim(),
             ...(media !== undefined && { media }),
+            ...(blockedDates !== undefined && { blockedDates }),
+            ...(featuredSong !== undefined && { featuredSong }),
             updatedAt: now,
         };
 
@@ -61,6 +67,50 @@ export class ArtistProfilesService {
 
         const updated = await ref.get();
         return { uid: updated.id!, ...updated.data() } as ArtistProfileRecord;
+    }
+
+    /** Helper: get format YYYY-MM-DD from Timestamp or Date */
+    private formatDate(date: any): string {
+        try {
+            const d = date?.toDate ? date.toDate() : new Date(date);
+            return d.toISOString().split('T')[0];
+        } catch {
+            return '';
+        }
+    }
+
+    /** Get availability status (blocked, reserved, pending). */
+    async getAvailability(uid: string): Promise<ArtistAvailability> {
+        const profile = await this.getByUid(uid);
+        const availability: ArtistAvailability = {
+            blocked: profile?.blockedDates || [],
+            reserved: [],
+            pending: [],
+        };
+
+        // Query all contracts for this artist
+        const contractsSnapshot = await this.db.collection('contracts')
+            .where('artistId', '==', uid)
+            .where('status', 'in', [ContractStatus.ACCEPTED, ContractStatus.PENDING, ContractStatus.COMPLETED])
+            .get();
+
+        contractsSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const dateStr = this.formatDate(data.eventDetails?.date);
+            if (!dateStr) return;
+
+            if (data.status === ContractStatus.ACCEPTED || data.status === ContractStatus.COMPLETED) {
+                availability.reserved.push(dateStr);
+            } else if (data.status === ContractStatus.PENDING) {
+                availability.pending.push(dateStr);
+            }
+        });
+
+        // Deduplicate strings
+        availability.reserved = [...new Set(availability.reserved)];
+        availability.pending = [...new Set(availability.pending)];
+
+        return availability;
     }
 
     /** Increment visit count and daily history. */

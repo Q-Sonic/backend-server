@@ -239,6 +239,29 @@ const options: swaggerJsdoc.Options = {
                         photo: { type: 'string' },
                     },
                 },
+                CreateOrUpdateArtistProfileBody: {
+                    type: 'object',
+                    properties: {
+                        biography: { type: 'string' },
+                        city: { type: 'string' },
+                        photo: { type: 'string', format: 'binary', description: 'Opcional si es multipart' },
+                        instagram: { type: 'string' },
+                        facebook: { type: 'string' },
+                        twitter: { type: 'string' },
+                        youtube: { type: 'string' },
+                        tiktok: { type: 'string' },
+                        blockedDates: { type: 'array', items: { type: 'string' }, description: 'JSON string si es multipart' },
+                        featuredSong: { type: 'object', description: 'JSON string si es multipart' },
+                    },
+                },
+                ArtistAvailability: {
+                    type: 'object',
+                    properties: {
+                        blocked: { type: 'array', items: { type: 'string' } },
+                        reserved: { type: 'array', items: { type: 'string' } },
+                        pending: { type: 'array', items: { type: 'string' } },
+                    },
+                },
                 SocialNetworks: {
                     type: 'object',
                     properties: {
@@ -257,6 +280,16 @@ const options: swaggerJsdoc.Options = {
                         socialNetworks: { $ref: '#/components/schemas/SocialNetworks' },
                         photo: { type: 'string' },
                         city: { type: 'string', example: 'Barcelona' },
+                        blockedDates: { type: 'array', items: { type: 'string', format: 'date' }, example: ['2026-04-20', '2026-04-21'] },
+                        featuredSong: {
+                            type: 'object',
+                            properties: {
+                                title: { type: 'string', example: 'La Bachata' },
+                                artistName: { type: 'string', example: 'Manuel Turizo' },
+                                streamUrl: { type: 'string', example: 'https://open.spotify.com/...' },
+                                coverUrl: { type: 'string', example: 'https://...' },
+                            },
+                        },
                         totalVisits: { type: 'number', example: 150 },
                         visitsHistory: { type: 'object', additionalProperties: { type: 'number' }, example: { '2026-03-18': 15 } },
                         createdAt: { type: 'string', format: 'date-time' },
@@ -280,15 +313,6 @@ const options: swaggerJsdoc.Options = {
                                 },
                             },
                         },
-                    },
-                },
-                CreateOrUpdateArtistProfileBody: {
-                    type: 'object',
-                    properties: {
-                        biography: { type: 'string' },
-                        socialNetworks: { $ref: '#/components/schemas/SocialNetworks' },
-                        photo: { type: 'string' },
-                        city: { type: 'string' },
                     },
                 },
                 EventDetails: {
@@ -1015,6 +1039,29 @@ const options: swaggerJsdoc.Options = {
                         '401': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                         '403': { description: 'Sin permiso', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                         '404': { description: 'Perfil no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            },
+            '/artist-profiles/{id}/availability': {
+                get: {
+                    tags: ['Artist Profile'],
+                    summary: 'Obtener resumen de disponibilidad del artista',
+                    description: 'Consolida bloqueos manuales, reservas aceptadas y pendientes.',
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'UID del artista' }],
+                    responses: {
+                        '200': {
+                            description: 'Disponibilidad del artista',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ArtistAvailability' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
                     },
                 },
             },

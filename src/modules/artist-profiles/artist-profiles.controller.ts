@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ArtistProfilesService } from './artist-profiles.service';
 import { StorageService } from '../storage/storage.service';
 import { UsersService } from '../users/users.service';
@@ -61,12 +61,19 @@ export async function getArtistProfileById(req: AuthRequest, res: Response): Pro
         }
 
         sendSuccess(res, profile);
-    } catch (err) {
-        sendError({
-            res,
-            error: err instanceof Error ? err.message : 'Failed to get profile',
-            statusCode: 500,
-        });
+    } catch (err: any) {
+        sendError({ res, error: err.message, statusCode: 500 });
+    }
+}
+
+/** GET availability status (blocked, reserved, pending) */
+export async function getArtistAvailability(req: Request, res: Response): Promise<void> {
+    try {
+        const id = String(req.params.id);
+        const availability = await artistProfilesService.getAvailability(id);
+        sendSuccess(res, availability);
+    } catch (error: any) {
+        sendError({ res, error: error.message, statusCode: 500 });
     }
 }
 
@@ -140,6 +147,21 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
                 body.media = undefined;
             }
         }
+        if (typeof body.blockedDates === 'string') {
+            try {
+                body.blockedDates = JSON.parse(body.blockedDates as string) as string[];
+            } catch {
+                body.blockedDates = undefined;
+            }
+        }
+        if (typeof body.featuredSong === 'string') {
+            try {
+                body.featuredSong = JSON.parse(body.featuredSong as string) as Record<string, string>;
+            } catch {
+                body.featuredSong = undefined;
+            }
+        }
+
         let photoUrl = typeof body.photo === 'string' ? body.photo : undefined;
 
         if (req.file) {
@@ -180,6 +202,8 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
             photo: photoUrl,
             city: typeof body.city === 'string' ? body.city : undefined,
             media,
+            blockedDates: body.blockedDates as string[] | undefined,
+            featuredSong: body.featuredSong as any,
         });
         sendSuccess(res, profile, 'Profile saved');
     } catch (err) {

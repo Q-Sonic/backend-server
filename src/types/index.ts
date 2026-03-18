@@ -138,6 +138,15 @@ export interface ArtistProfileRecord {
     socialNetworks: SocialNetworks;
     photo: string;
     city: string;
+    /** List of blocked dates in YYYY-MM-DD format. */
+    blockedDates?: string[];
+    /** Featured song for the profile player. */
+    featuredSong?: {
+        title: string;
+        artistName: string;
+        streamUrl: string;
+        coverUrl?: string;
+    };
     /** Gallery media URLs (images, audio, video). */
     media?: ArtistProfileMediaItem[];
     /** Stats for dashboard */
@@ -163,6 +172,19 @@ export interface CreateOrUpdateArtistProfileInput {
     photo?: string;
     city?: string;
     media?: ArtistProfileMediaItem[];
+    blockedDates?: string[];
+    featuredSong?: {
+        title: string;
+        artistName: string;
+        streamUrl: string;
+        coverUrl?: string;
+    };
+}
+
+export interface ArtistAvailability {
+    blocked: string[]; // Manual blocks
+    reserved: string[]; // ACCEPTED/COMPLETED contracts
+    pending: string[]; // PENDING contracts
 }
 
 // ─── Contratos, Eventos y Pagos (US-8) ──────────────────────────────────────

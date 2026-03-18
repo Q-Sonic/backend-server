@@ -45,6 +45,7 @@ jest.mock('../config/firebase', () => ({
         firestore: {
             Timestamp: {
                 now: jest.fn(() => ({ toDate: () => new Date() })),
+                fromDate: jest.fn((date) => ({ toDate: () => date })),
             },
         },
     },

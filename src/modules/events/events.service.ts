@@ -1,0 +1,85 @@
+import { getFirestore, admin } from '../../config/firebase';
+import { ContractRecord, ExtendedContractDetail } from '../../types';
+import { ContractStatus } from '../../enum/contract.enum';
+import { ClientProfilesService } from '../client-profiles/client-profiles.service';
+import { StorageService } from '../storage/storage.service';
+import { UsersService } from '../users/users.service';
+import { extractFilePathFromStorageUrl } from '../../helper/storage';
+
+const CONTRACTS_COLLECTION = 'contracts';
+
+export class EventsService {
+    private db: admin.firestore.Firestore;
+    private clientProfilesService: ClientProfilesService;
+    private storageService: StorageService;
+    private usersService: UsersService;
+
+    constructor() {
+        this.db = getFirestore();
+        this.clientProfilesService = new ClientProfilesService();
+        this.storageService = new StorageService();
+        this.usersService = new UsersService();
+    }
+
+    async getCalendarEvents(artistUid: string, startDate?: Date, endDate?: Date): Promise<ContractRecord[]> {
+        let query = this.db.collection(CONTRACTS_COLLECTION)
+            .where('artistId', '==', artistUid);
+
+        // Filter by date if provided
+        if (startDate) {
+            query = query.where('eventDetails.date', '>=', admin.firestore.Timestamp.fromDate(startDate));
+        }
+        if (endDate) {
+            query = query.where('eventDetails.date', '<=', admin.firestore.Timestamp.fromDate(endDate));
+        }
+
+        const snapshot = await query.get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractRecord))
+            .sort((a, b) => {
+                const at = a.eventDetails?.date?.toMillis?.() || 0;
+                const bt = b.eventDetails?.date?.toMillis?.() || 0;
+                return at - bt;
+            });
+    }
+
+    async getExtendedEventDetail(contractId: string, artistUid: string): Promise<ExtendedContractDetail> {
+        const doc = await this.db.collection(CONTRACTS_COLLECTION).doc(contractId).get();
+        if (!doc.exists) throw new Error('Contract not found');
+
+        const data = doc.data() as ContractRecord;
+        if (data.artistId !== artistUid) throw new Error('Unauthorized access to this event');
+
+        const detail: ExtendedContractDetail = { id: doc.id, ...data };
+
+        // 1. Get Client Contact Info
+        try {
+            const clientProfile = await this.clientProfilesService.getByUid(data.clientId);
+            const clientUser = await this.usersService.findById(data.clientId);
+
+            detail.clientContact = {
+                name: clientProfile?.name || clientUser?.displayName || 'Unknown',
+                email: clientUser?.email || '',
+                phone: clientProfile?.phone || '',
+            };
+        } catch (e) {
+            console.error('Error fetching client contact info:', e);
+        }
+
+        // 2. Generate Temporary Download Links
+        if (data.riderUrl) {
+            const riderPath = extractFilePathFromStorageUrl(data.riderUrl);
+            if (riderPath) {
+                detail.riderDownloadUrl = await this.storageService.getSignedUrl(riderPath);
+            }
+        }
+
+        if (data.contractUrl) {
+            const contractPath = extractFilePathFromStorageUrl(data.contractUrl);
+            if (contractPath) {
+                detail.contractDownloadUrl = await this.storageService.getSignedUrl(contractPath);
+            }
+        }
+
+        return detail;
+    }
+}

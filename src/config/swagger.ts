@@ -328,9 +328,31 @@ const options: swaggerJsdoc.Options = {
                         eventDetails: { $ref: '#/components/schemas/EventDetails' },
                         financials: { $ref: '#/components/schemas/ContractFinancials' },
                         payments: { type: 'array', items: { $ref: '#/components/schemas/PaymentItem' } },
+                        contractUrl: { type: 'string', description: 'URL del contrato PDF' },
+                        riderUrl: { type: 'string', description: 'URL del rider técnico' },
                         createdAt: { type: 'string', format: 'date-time' },
                         updatedAt: { type: 'string', format: 'date-time' },
                     },
+                },
+                ExtendedContractDetail: {
+                    allOf: [
+                        { $ref: '#/components/schemas/ContractRecord' },
+                        {
+                            type: 'object',
+                            properties: {
+                                clientContact: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string' },
+                                        email: { type: 'string' },
+                                        phone: { type: 'string' },
+                                    },
+                                },
+                                riderDownloadUrl: { type: 'string', description: 'URL temporal de descarga del rider' },
+                                contractDownloadUrl: { type: 'string', description: 'URL temporal de descarga del contrato' },
+                            },
+                        },
+                    ],
                 },
                 CreateContractBody: {
                     type: 'object',
@@ -378,6 +400,7 @@ const options: swaggerJsdoc.Options = {
             { name: 'Client Profile', description: 'Perfil de cliente (US-6, US-7)' },
             { name: 'Artist Profile', description: 'Perfil público del artista (US-10)' },
             { name: 'Dashboard', description: 'Estadísticas y balance del artista' },
+            { name: 'Events', description: 'Gestión de calendario y detalles de shows para artistas' },
             { name: 'Contracts', description: 'Gestión de contratos, eventos y pagos (US-8, US-5)' },
         ],
         paths: {
@@ -1154,6 +1177,59 @@ const options: swaggerJsdoc.Options = {
                             },
                         },
                         '403': { description: 'Acceso denegado: Solo artistas' },
+                    },
+                },
+            },
+            '/events/calendar': {
+                get: {
+                    tags: ['Events'],
+                    summary: 'Listar eventos para el calendario del artista',
+                    description: 'Filtra contratos del artista por rango de fechas (opcional).',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [
+                        { name: 'start', in: 'query', schema: { type: 'string', format: 'date' }, description: 'Fecha inicio (YYYY-MM-DD)' },
+                        { name: 'end', in: 'query', schema: { type: 'string', format: 'date' }, description: 'Fecha fin (YYYY-MM-DD)' },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Lista de eventos',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { type: 'array', items: { $ref: '#/components/schemas/ContractRecord' } } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            '/events/{id}': {
+                get: {
+                    tags: ['Events'],
+                    summary: 'Obtener detalle extendido de un evento',
+                    description: 'Incluye información de contacto del cliente y links temporales de descarga.',
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'ID del contrato/evento' }],
+                    responses: {
+                        '200': {
+                            description: 'Detalle extendido',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/ExtendedContractDetail' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '403': { description: 'No autorizado para ver este evento' },
+                        '404': { description: 'Evento no encontrado' },
                     },
                 },
             },

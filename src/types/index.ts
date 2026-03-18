@@ -84,6 +84,8 @@ export interface ArtistServiceRecord {
     name: string;
     price: number;
     description: string;
+    /** Rider URL (PDF in Storage) */
+    riderUrl?: string;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -193,8 +195,22 @@ export interface ContractRecord {
     eventDetails: EventDetails;
     financials: ContractFinancials;
     payments: PaymentItem[];
+    /** PDF Contract URL */
+    contractUrl?: string;
+    /** Captured Rider URL at booking time */
+    riderUrl?: string;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export interface ExtendedContractDetail extends ContractRecord {
+    clientContact?: {
+        name: string;
+        email: string;
+        phone: string;
+    };
+    riderDownloadUrl?: string;
+    contractDownloadUrl?: string;
 }
 
 export interface CreateContractInput {

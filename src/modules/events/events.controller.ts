@@ -35,7 +35,7 @@ export class EventsController {
         const { id } = req.params;
 
         try {
-            const detail = await eventsService.getExtendedEventDetail(id, uid);
+            const detail = await eventsService.getExtendedEventDetail(id as string, uid as string);
             res.status(200).json({ success: true, data: detail } as ApiResponse);
         } catch (error: any) {
             const statusCode = error.message.includes('Unauthorized') ? 403 : 404;

@@ -34,7 +34,7 @@ export class EventsService {
         }
 
         const snapshot = await query.get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractRecord))
+        return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ContractRecord))
             .sort((a, b) => {
                 const at = a.eventDetails?.date?.toMillis?.() || 0;
                 const bt = b.eventDetails?.date?.toMillis?.() || 0;
@@ -49,7 +49,7 @@ export class EventsService {
         const data = doc.data() as ContractRecord;
         if (data.artistId !== artistUid) throw new Error('Unauthorized access to this event');
 
-        const detail: ExtendedContractDetail = { id: doc.id, ...data };
+        const detail = { ...data, id: doc.id } as ExtendedContractDetail;
 
         // 1. Get Client Contact Info
         try {

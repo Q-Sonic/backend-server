@@ -1156,6 +1156,7 @@ const options: swaggerJsdoc.Options = {
                         '403': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
                     },
                 },
+            },
             '/dashboard/stats': {
                 get: {
                     tags: ['Dashboard'],

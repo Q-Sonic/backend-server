@@ -54,6 +54,12 @@ export async function getArtistProfileById(req: AuthRequest, res: Response): Pro
             sendNotFound(res, 'Artist profile not found');
             return;
         }
+
+        // Increment visit if viewed by client or different artist
+        if (req.user?.uid !== id) {
+            artistProfilesService.incrementVisits(id).catch(console.error);
+        }
+
         sendSuccess(res, profile);
     } catch (err) {
         sendError({

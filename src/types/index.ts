@@ -138,8 +138,21 @@ export interface ArtistProfileRecord {
     city: string;
     /** Gallery media URLs (images, audio, video). */
     media?: ArtistProfileMediaItem[];
+    /** Stats for dashboard */
+    totalVisits?: number;
+    /** Map of date (YYYY-MM-DD) -> count */
+    visitsHistory?: Record<string, number>;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
+}
+
+// ─── Dashboard Stats ──────────────────────────────────────────────────────────
+export interface DashboardStats {
+    totalEvents: number;
+    eventsGrowthPercent: number;
+    totalBalance: number;
+    profileVisitsTotal: number;
+    visitsChartData: { day: string; count: number }[];
 }
 
 export interface CreateOrUpdateArtistProfileInput {

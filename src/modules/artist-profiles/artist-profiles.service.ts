@@ -62,4 +62,26 @@ export class ArtistProfilesService {
         const updated = await ref.get();
         return { uid: updated.id!, ...updated.data() } as ArtistProfileRecord;
     }
+
+    /** Increment visit count and daily history. */
+    async incrementVisits(uid: string): Promise<void> {
+        const ref = this.db.collection(COLLECTION).doc(uid);
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        await this.db.runTransaction(async (transaction) => {
+            const doc = await transaction.get(ref);
+            if (!doc.exists) return;
+
+            const data = doc.data() as ArtistProfileRecord;
+            const currentTotal = data.totalVisits || 0;
+            const currentHistory = data.visitsHistory || {};
+            const todayCount = currentHistory[todayStr] || 0;
+
+            transaction.update(ref, {
+                totalVisits: currentTotal + 1,
+                [`visitsHistory.${todayStr}`]: todayCount + 1,
+                updatedAt: admin.firestore.Timestamp.now(),
+            });
+        });
+    }
 }

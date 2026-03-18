@@ -257,8 +257,29 @@ const options: swaggerJsdoc.Options = {
                         socialNetworks: { $ref: '#/components/schemas/SocialNetworks' },
                         photo: { type: 'string' },
                         city: { type: 'string', example: 'Barcelona' },
+                        totalVisits: { type: 'number', example: 150 },
+                        visitsHistory: { type: 'object', additionalProperties: { type: 'number' }, example: { '2026-03-18': 15 } },
                         createdAt: { type: 'string', format: 'date-time' },
                         updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                },
+                DashboardStats: {
+                    type: 'object',
+                    properties: {
+                        totalEvents: { type: 'number', example: 20 },
+                        eventsGrowthPercent: { type: 'number', example: 25 },
+                        totalBalance: { type: 'number', example: 285410.12 },
+                        profileVisitsTotal: { type: 'number', example: 150 },
+                        visitsChartData: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    day: { type: 'string', example: 'Lun' },
+                                    count: { type: 'number', example: 10 },
+                                },
+                            },
+                        },
                     },
                 },
                 CreateOrUpdateArtistProfileBody: {
@@ -356,6 +377,7 @@ const options: swaggerJsdoc.Options = {
             { name: 'Artist Services', description: 'CRUD de servicios/precios del artista (concierto, acústico, evento privado)' },
             { name: 'Client Profile', description: 'Perfil de cliente (US-6, US-7)' },
             { name: 'Artist Profile', description: 'Perfil público del artista (US-10)' },
+            { name: 'Dashboard', description: 'Estadísticas y balance del artista' },
             { name: 'Contracts', description: 'Gestión de contratos, eventos y pagos (US-8, US-5)' },
         ],
         paths: {
@@ -1109,6 +1131,29 @@ const options: swaggerJsdoc.Options = {
                     responses: {
                         '200': { description: 'Pago registrado', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { properties: { data: { $ref: '#/components/schemas/ContractRecord' } } }] } } } },
                         '403': { description: 'No autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
+                    },
+                },
+            '/dashboard/stats': {
+                get: {
+                    tags: ['Dashboard'],
+                    summary: 'Obtener resumen de estadísticas del artista',
+                    description: 'Solo requiere rol de artista. Retorna crecimiento de eventos, balance total y visitas.',
+                    security: [{ bearerAuth: [] }],
+                    responses: {
+                        '200': {
+                            description: 'Estadísticas del dashboard',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        allOf: [
+                                            { $ref: '#/components/schemas/ApiResponse' },
+                                            { properties: { data: { $ref: '#/components/schemas/DashboardStats' } } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                        '403': { description: 'Acceso denegado: Solo artistas' },
                     },
                 },
             },

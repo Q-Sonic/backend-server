@@ -10,6 +10,7 @@ import artistServicesRoutes from './modules/artist-services/artist-services.rout
 import clientProfilesRoutes from './modules/client-profiles/client-profiles.routes';
 import artistProfilesRoutes from './modules/artist-profiles/artist-profiles.routes';
 import contractsRoutes from './modules/contracts/contracts.routes';
+import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import { errorMiddleware } from './middleware/error.middleware';
 import { sendSuccess } from './utils/response.util';
 import { setupSwagger } from './config/swagger';
@@ -35,6 +36,7 @@ app.use('/api/artist-services', artistServicesRoutes);
 app.use('/api/client-profiles', clientProfilesRoutes);
 app.use('/api/artist-profiles', artistProfilesRoutes);
 app.use('/api/contracts', contractsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // ─── Swagger Docs ─────────────────────────────────────────────────────────────
 setupSwagger(app);

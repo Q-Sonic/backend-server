@@ -13,7 +13,7 @@ router.use(roleGuard(UserRoleEnum.ARTISTA));
 
 /**
  * @swagger
- * /api/dashboard/stats:
+ * /dashboard/stats:
  *   get:
  *     summary: Artist dashboard summary (events growth, balance, visits)
  *     tags: [Dashboard]

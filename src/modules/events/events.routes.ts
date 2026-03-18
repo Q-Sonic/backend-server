@@ -13,7 +13,7 @@ router.use(roleGuard(UserRoleEnum.ARTISTA));
 
 /**
  * @swagger
- * /api/events/calendar:
+ * /events/calendar:
  *   get:
  *     summary: Get calendar events for artist
  *     tags: [Events]
@@ -32,7 +32,7 @@ router.get('/calendar', (req, res) => controller.getCalendar(req, res));
 
 /**
  * @swagger
- * /api/events/{id}:
+ * /events/{id}:
  *   get:
  *     summary: Get extended event detail (client info, download links)
  *     tags: [Events]

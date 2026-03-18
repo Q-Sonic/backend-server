@@ -4,24 +4,67 @@ import { authMiddleware } from '../../middleware/auth.middleware';
 
 const router = Router();
 
-// POST /api/auth/register
+/**
+ * @swagger
+ * /auth/register:
+ *   post:
+ *     summary: Registrar un nuevo usuario
+ *     tags: [Auth]
+ */
 router.post('/register', register);
 
-// POST /api/auth/login
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Iniciar sesión
+ *     tags: [Auth]
+ */
 router.post('/login', login);
 
-// POST /api/auth/google  ← Login / Registro con Google OAuth
+/**
+ * @swagger
+ * /auth/google:
+ *   post:
+ *     summary: Login con Google
+ *     tags: [Auth]
+ */
 router.post('/google', googleLogin);
 
-// POST /api/auth/verify-email (STUB)
-router.post('/verify-email', verifyEmail);
-
-// --- Recuperar Contraseña ---
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Solicitar recuperación de contraseña
+ *     tags: [Auth]
+ */
 router.post('/forgot-password', forgotPassword);
+
+/**
+ * @swagger
+ * /auth/verify-reset-code:
+ *   post:
+ *     summary: Verificar código de recuperación
+ *     tags: [Auth]
+ */
 router.post('/verify-reset-code', verifyResetCode);
+
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     summary: Restablecer contraseña
+ *     tags: [Auth]
+ */
 router.post('/reset-password', resetPassword);
 
-// GET /api/auth/me  (protegida)
+/**
+ * @swagger
+ * /auth/me:
+ *   get:
+ *     summary: Obtener perfil actual (auth)
+ *     tags: [Auth]
+ */
 router.get('/me', authMiddleware, getMe);
 
 export default router;

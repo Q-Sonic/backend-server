@@ -24,7 +24,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ─── Health Check ─────────────────────────────────────────────────────────────
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Health check
+ *     responses:
+ *       200:
+ *         description: Server is live
+ */
 app.get('/api/health', (_req, res) => {
     sendSuccess(res, { uptime: process.uptime() }, 'Q-Music API is running 🎵');
 });

@@ -61,3 +61,4 @@ export function extractFilePathFromStorageUrl(url: string): string | null {
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;   // 5 MB
 export const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB (short videos)
 export const MAX_AUDIO_SIZE = 10 * 1024 * 1024;  // 10 MB
+export const MAX_PDF_SIZE = 10 * 1024 * 1024;    // 10 MB

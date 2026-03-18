@@ -4,6 +4,7 @@ import {
     CreateOrUpdateArtistProfileInput,
     SocialNetworks,
     ArtistAvailability,
+    ArtistProfileMediaItem,
 } from '../../types';
 import { ContractStatus } from '../../enum/contract.enum';
 
@@ -47,6 +48,7 @@ export class ArtistProfilesService {
         const media = input.media !== undefined ? input.media : existing?.media;
         const blockedDates = input.blockedDates !== undefined ? input.blockedDates : existing?.blockedDates;
         const featuredSong = input.featuredSong !== undefined ? input.featuredSong : existing?.featuredSong;
+        const technicalRiderUrl = input.technicalRiderUrl !== undefined ? input.technicalRiderUrl : existing?.technicalRiderUrl;
 
         const data = {
             biography: (input.biography ?? existing?.biography ?? '').trim(),
@@ -56,6 +58,7 @@ export class ArtistProfilesService {
             ...(media !== undefined && { media }),
             ...(blockedDates !== undefined && { blockedDates }),
             ...(featuredSong !== undefined && { featuredSong }),
+            ...(technicalRiderUrl !== undefined && { technicalRiderUrl }),
             updatedAt: now,
         };
 
@@ -123,8 +126,8 @@ export class ArtistProfilesService {
             if (!doc.exists) return;
 
             const data = doc.data() as ArtistProfileRecord;
-            const currentTotal = data.totalVisits || 0;
-            const currentHistory = data.visitsHistory || {};
+            const currentTotal = (data as any).totalVisits || 0;
+            const currentHistory = (data as any).visitsHistory || {};
             const todayCount = currentHistory[todayStr] || 0;
 
             transaction.update(ref, {
@@ -132,6 +135,22 @@ export class ArtistProfilesService {
                 [`visitsHistory.${todayStr}`]: todayCount + 1,
                 updatedAt: admin.firestore.Timestamp.now(),
             });
+        });
+    }
+
+    async addMedia(uid: string, items: ArtistProfileMediaItem[]): Promise<void> {
+        const ref = this.db.collection(COLLECTION).doc(uid);
+        await ref.update({
+            media: admin.firestore.FieldValue.arrayUnion(...items),
+            updatedAt: admin.firestore.Timestamp.now(),
+        });
+    }
+
+    async removeMedia(uid: string, item: ArtistProfileMediaItem): Promise<void> {
+        const ref = this.db.collection(COLLECTION).doc(uid);
+        await ref.update({
+            media: admin.firestore.FieldValue.arrayRemove(item),
+            updatedAt: admin.firestore.Timestamp.now(),
         });
     }
 }

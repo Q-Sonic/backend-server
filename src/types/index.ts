@@ -147,6 +147,8 @@ export interface ArtistProfileRecord {
         streamUrl: string;
         coverUrl?: string;
     };
+    /** Link to technical rider (PDF) */
+    technicalRiderUrl?: string;
     /** Gallery media URLs (images, audio, video). */
     media?: ArtistProfileMediaItem[];
     /** Stats for dashboard */
@@ -179,6 +181,7 @@ export interface CreateOrUpdateArtistProfileInput {
         streamUrl: string;
         coverUrl?: string;
     };
+    technicalRiderUrl?: string;
 }
 
 export interface ArtistAvailability {

@@ -97,6 +97,15 @@ const options: swaggerJsdoc.Options = {
                         featuredSong: { type: 'object' },
                     },
                 },
+                ArtistProfileMediaItem: {
+                    type: 'object',
+                    required: ['url', 'type'],
+                    properties: {
+                        url: { type: 'string', example: 'https://storage...' },
+                        type: { type: 'string', enum: ['image', 'audio', 'video'], example: 'image' },
+                        name: { type: 'string', example: 'concert_photo.jpg' },
+                    },
+                },
                 ArtistAvailability: {
                     type: 'object',
                     properties: {
@@ -129,6 +138,7 @@ const options: swaggerJsdoc.Options = {
                         biography: { type: 'string' },
                         city: { type: 'string' },
                         photo: { type: 'string', format: 'binary' },
+                        rider: { type: 'string', format: 'binary', description: 'Technical rider in PDF' },
                         blockedDates: { type: 'array', items: { type: 'string' } },
                         featuredSong: { type: 'object' },
                     },

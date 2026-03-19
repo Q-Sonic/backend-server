@@ -84,6 +84,8 @@ export interface ArtistServiceRecord {
     name: string;
     price: number;
     description: string;
+    /** Rider URL (PDF in Storage) */
+    riderUrl?: string;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -136,10 +138,34 @@ export interface ArtistProfileRecord {
     socialNetworks: SocialNetworks;
     photo: string;
     city: string;
+    /** List of blocked dates in YYYY-MM-DD format. */
+    blockedDates?: string[];
+    /** Featured song for the profile player. */
+    featuredSong?: {
+        title: string;
+        artistName: string;
+        streamUrl: string;
+        coverUrl?: string;
+    };
+    /** Link to technical rider (PDF) */
+    technicalRiderUrl?: string;
     /** Gallery media URLs (images, audio, video). */
     media?: ArtistProfileMediaItem[];
+    /** Stats for dashboard */
+    totalVisits?: number;
+    /** Map of date (YYYY-MM-DD) -> count */
+    visitsHistory?: Record<string, number>;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
+}
+
+// ─── Dashboard Stats ──────────────────────────────────────────────────────────
+export interface DashboardStats {
+    totalEvents: number;
+    eventsGrowthPercent: number;
+    totalBalance: number;
+    profileVisitsTotal: number;
+    visitsChartData: { day: string; count: number }[];
 }
 
 export interface CreateOrUpdateArtistProfileInput {
@@ -148,6 +174,20 @@ export interface CreateOrUpdateArtistProfileInput {
     photo?: string;
     city?: string;
     media?: ArtistProfileMediaItem[];
+    blockedDates?: string[];
+    featuredSong?: {
+        title: string;
+        artistName: string;
+        streamUrl: string;
+        coverUrl?: string;
+    };
+    technicalRiderUrl?: string;
+}
+
+export interface ArtistAvailability {
+    blocked: string[]; // Manual blocks
+    reserved: string[]; // ACCEPTED/COMPLETED contracts
+    pending: string[]; // PENDING contracts
 }
 
 // ─── Contratos, Eventos y Pagos (US-8) ──────────────────────────────────────
@@ -180,8 +220,22 @@ export interface ContractRecord {
     eventDetails: EventDetails;
     financials: ContractFinancials;
     payments: PaymentItem[];
+    /** PDF Contract URL */
+    contractUrl?: string;
+    /** Captured Rider URL at booking time */
+    riderUrl?: string;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export interface ExtendedContractDetail extends ContractRecord {
+    clientContact?: {
+        name: string;
+        email: string;
+        phone: string;
+    };
+    riderDownloadUrl?: string;
+    contractDownloadUrl?: string;
 }
 
 export interface CreateContractInput {

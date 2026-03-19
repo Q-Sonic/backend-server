@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ArtistProfilesService } from './artist-profiles.service';
 import { StorageService } from '../storage/storage.service';
 import { UsersService } from '../users/users.service';
@@ -12,7 +12,8 @@ const storageService = new StorageService();
 const usersService = new UsersService();
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_PDF_TYPES = ['application/pdf'];
+import { MAX_IMAGE_SIZE, MAX_PDF_SIZE, MAX_VIDEO_SIZE, MAX_AUDIO_SIZE } from '../../helper/storage';
 
 function getUid(req: AuthRequest): string {
     const uid = req.user?.uid;
@@ -31,7 +32,7 @@ export async function listArtistProfiles(req: AuthRequest, res: Response): Promi
             displayName: displayNames[p.uid] ?? '',
         }));
         sendSuccess(res, list);
-    } catch (err) {
+    } catch (err: any) {
         sendError({
             res,
             error: err instanceof Error ? err.message : 'Failed to list artist profiles',
@@ -54,13 +55,26 @@ export async function getArtistProfileById(req: AuthRequest, res: Response): Pro
             sendNotFound(res, 'Artist profile not found');
             return;
         }
+
+        // Increment visit if viewed by client or different artist
+        if (req.user?.uid !== id) {
+            artistProfilesService.incrementVisits(id).catch(console.error);
+        }
+
         sendSuccess(res, profile);
-    } catch (err) {
-        sendError({
-            res,
-            error: err instanceof Error ? err.message : 'Failed to get profile',
-            statusCode: 500,
-        });
+    } catch (err: any) {
+        sendError({ res, error: err.message, statusCode: 500 });
+    }
+}
+
+/** GET availability status (blocked, reserved, pending) */
+export async function getArtistAvailability(req: Request, res: Response): Promise<void> {
+    try {
+        const id = String(req.params.id);
+        const availability = await artistProfilesService.getAvailability(id);
+        sendSuccess(res, availability);
+    } catch (error: any) {
+        sendError({ res, error: error.message, statusCode: 500 });
     }
 }
 
@@ -73,7 +87,7 @@ export async function getMyProfile(req: AuthRequest, res: Response): Promise<voi
             return;
         }
         sendSuccess(res, profile);
-    } catch (err) {
+    } catch (err: any) {
         if (err instanceof Error && err.message === 'Unauthorized') {
             sendForbidden(res, 'Acceso denegado');
             return;
@@ -134,36 +148,73 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
                 body.media = undefined;
             }
         }
-        let photoUrl = typeof body.photo === 'string' ? body.photo : undefined;
+        if (typeof body.blockedDates === 'string') {
+            try {
+                body.blockedDates = JSON.parse(body.blockedDates as string) as string[];
+            } catch {
+                body.blockedDates = undefined;
+            }
+        }
+        if (typeof body.featuredSong === 'string') {
+            try {
+                body.featuredSong = JSON.parse(body.featuredSong as string) as Record<string, string>;
+            } catch {
+                body.featuredSong = undefined;
+            }
+        }
 
-        if (req.file) {
-            if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) {
-                sendError({ res, error: 'Photo must be an image (jpeg, png, webp, gif)', statusCode: 400 });
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+        let photoUrl: string | undefined;
+        let technicalRiderUrl: string | undefined;
+
+        const existing = await artistProfilesService.getByUid(uid);
+
+        // 1. Process Photo
+        if (files?.photo?.[0]) {
+            const photoFile = files.photo[0];
+            if (!ALLOWED_IMAGE_TYPES.includes(photoFile.mimetype)) {
+                sendError({ res, error: 'Invalid image format. Supported: JPEG, PNG, WEBP, GIF', statusCode: 400 });
                 return;
             }
-            if (req.file.size > MAX_PHOTO_SIZE) {
+            if (photoFile.size > MAX_IMAGE_SIZE) {
                 sendError({ res, error: 'Photo too large. Maximum size is 5 MB', statusCode: 400 });
                 return;
             }
-            const existing = await artistProfilesService.getByUid(uid);
             if (existing?.photo) {
                 const oldPath = extractFilePathFromStorageUrl(existing.photo);
                 if (oldPath) {
                     try {
                         await storageService.deleteFile(oldPath);
-                    } catch {
-                        // ignore: file may already be deleted
-                    }
+                    } catch { /* ignore */ }
                 }
             }
-            const ext = req.file.originalname.split('.').pop() || 'jpg';
+            const ext = photoFile.originalname.split('.').pop() || 'jpg';
             const fileName = `photo_${Date.now()}.${ext}`;
-            photoUrl = await storageService.uploadFile(
-                req.file.buffer,
-                fileName,
-                req.file.mimetype,
-                `artist_profiles/${uid}`
-            );
+            photoUrl = await storageService.uploadFile(photoFile.buffer, fileName, photoFile.mimetype, `artist_profiles/${uid}`);
+        }
+
+        // 2. Process Rider (PDF)
+        if (files?.rider?.[0]) {
+            const riderFile = files.rider[0];
+            if (!ALLOWED_PDF_TYPES.includes(riderFile.mimetype)) {
+                sendError({ res, error: 'Invalid document format. Only PDF is allowed for riders', statusCode: 400 });
+                return;
+            }
+            if (riderFile.size > MAX_PDF_SIZE) {
+                sendError({ res, error: 'Rider PDF too large. Maximum size is 10 MB', statusCode: 400 });
+                return;
+            }
+            if (existing?.technicalRiderUrl) {
+                const oldPath = extractFilePathFromStorageUrl(existing.technicalRiderUrl);
+                if (oldPath) {
+                    try {
+                        await storageService.deleteFile(oldPath);
+                    } catch { /* ignore */ }
+                }
+            }
+            const ext = 'pdf';
+            const fileName = `rider_${Date.now()}.${ext}`;
+            technicalRiderUrl = await storageService.uploadFile(riderFile.buffer, fileName, riderFile.mimetype, `artist_profiles/${uid}`);
         }
 
         const media = parseMedia(body.media);
@@ -174,9 +225,12 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
             photo: photoUrl,
             city: typeof body.city === 'string' ? body.city : undefined,
             media,
+            blockedDates: body.blockedDates as string[] | undefined,
+            featuredSong: body.featuredSong as any,
+            technicalRiderUrl,
         });
         sendSuccess(res, profile, 'Profile saved');
-    } catch (err) {
+    } catch (err: any) {
         if (err instanceof Error && err.message === 'Unauthorized') {
             sendForbidden(res, 'Acceso denegado');
             return;
@@ -186,5 +240,65 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
             error: err instanceof Error ? err.message : 'Failed to save profile',
             statusCode: 400,
         });
+    }
+}
+
+export async function addMediaToGallery(req: AuthRequest, res: Response) {
+    try {
+        const uid = getUid(req);
+        const files = req.files as Express.Multer.File[] | undefined;
+        if (!files || files.length === 0) {
+            sendError({ res, error: 'No files provided', statusCode: 400 });
+            return;
+        }
+
+        const items: ArtistProfileMediaItem[] = [];
+        for (const file of files) {
+            let type: 'image' | 'audio' | 'video' = 'image';
+            let maxSize = MAX_IMAGE_SIZE;
+
+            if (file.mimetype.startsWith('video/')) {
+                type = 'video';
+                maxSize = MAX_VIDEO_SIZE;
+            } else if (file.mimetype.startsWith('audio/')) {
+                type = 'audio';
+                maxSize = MAX_AUDIO_SIZE;
+            }
+
+            if (file.size > maxSize) {
+                sendError({ res, error: `File ${file.originalname} is too large. Limit for ${type} is ${maxSize / (1024 * 1024)}MB`, statusCode: 400 });
+                return;
+            }
+
+            const fileName = `gallery_${Date.now()}_${file.originalname}`;
+            const url = await storageService.uploadFile(file.buffer, fileName, file.mimetype, `artist_profiles/${uid}/gallery`);
+            items.push({ url, type, name: file.originalname });
+        }
+
+        await artistProfilesService.addMedia(uid, items);
+        sendSuccess(res, items, 'Media added to gallery');
+    } catch (err: any) {
+        sendError({ res, error: err.message, statusCode: 500 });
+    }
+}
+
+export async function removeMediaFromGallery(req: AuthRequest, res: Response) {
+    try {
+        const uid = getUid(req);
+        const item = req.body as ArtistProfileMediaItem;
+        if (!item.url) {
+            sendError({ res, error: 'Media URL is required', statusCode: 400 });
+            return;
+        }
+
+        const path = extractFilePathFromStorageUrl(item.url);
+        if (path) {
+            try { await storageService.deleteFile(path); } catch { /* ignore */ }
+        }
+
+        await artistProfilesService.removeMedia(uid, item);
+        sendSuccess(res, null, 'Media removed from gallery');
+    } catch (err: any) {
+        sendError({ res, error: err.message, statusCode: 500 });
     }
 }

@@ -16,6 +16,11 @@ export const artistProfileSchema = z.object({
             streamUrl: z.string().url('URL de streaming inválida'),
             coverUrl: z.string().url('URL de carátula inválida').optional(),
         }).optional(),
-        // media can be complex, will add more validations if needed
+        media: z.array(z.object({
+            url: z.string().url('URL de media inválida'),
+            type: z.enum(['image', 'audio', 'video']),
+            name: z.string().optional(),
+            category: z.string().max(50).optional(),
+        })).optional(),
     }),
 });

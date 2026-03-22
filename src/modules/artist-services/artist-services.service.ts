@@ -49,6 +49,8 @@ export class ArtistServicesService {
             name: input.name.trim(),
             price: Number(input.price),
             description: (input.description ?? '').trim(),
+            duration: (input.duration ?? '').trim(),
+            features: input.features ?? [],
             createdAt: now,
             updatedAt: now,
         };
@@ -75,6 +77,8 @@ export class ArtistServicesService {
         if (input.name !== undefined) updates.name = input.name.trim();
         if (input.price !== undefined) updates.price = Number(input.price);
         if (input.description !== undefined) updates.description = input.description.trim();
+        if (input.duration !== undefined) updates.duration = input.duration.trim();
+        if (input.features !== undefined) updates.features = input.features;
 
         await ref.update(updates);
         const updated = await ref.get();

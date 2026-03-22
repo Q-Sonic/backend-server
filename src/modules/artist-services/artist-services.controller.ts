@@ -82,6 +82,8 @@ export async function createService(req: AuthRequest, res: Response): Promise<vo
             name: body.name,
             price: body.price,
             description: body.description ?? '',
+            duration: body.duration ?? '',
+            features: body.features ?? [],
         });
         sendCreated(res, created, 'Artist service created');
     } catch (err) {

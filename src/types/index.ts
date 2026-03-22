@@ -84,6 +84,10 @@ export interface ArtistServiceRecord {
     name: string;
     price: number;
     description: string;
+    /** Format: '60-90 min', '2 hours', etc. */
+    duration?: string;
+    /** List of features (e.g., ['Equipo de sonido incluido', 'Músicos de apoyo']) */
+    features?: string[];
     /** Rider URL (PDF in Storage) */
     riderUrl?: string;
     createdAt: FirebaseFirestore.Timestamp;
@@ -94,6 +98,8 @@ export interface CreateArtistServiceInput {
     name: string;
     price: number;
     description: string;
+    duration?: string;
+    features?: string[];
 }
 
 export type UpdateArtistServiceInput = Partial<CreateArtistServiceInput>;
@@ -130,6 +136,8 @@ export interface ArtistProfileMediaItem {
     url: string;
     type: 'image' | 'audio' | 'video';
     name?: string;
+    /** Category for gallery filtering (e.g., 'Conciertos', 'Backstage', 'Fans') */
+    category?: string;
 }
 
 export interface ArtistProfileRecord {
@@ -166,6 +174,7 @@ export interface DashboardStats {
     totalBalance: number;
     profileVisitsTotal: number;
     visitsChartData: { day: string; count: number }[];
+    nextEvent?: ContractRecord;
 }
 
 export interface CreateOrUpdateArtistProfileInput {

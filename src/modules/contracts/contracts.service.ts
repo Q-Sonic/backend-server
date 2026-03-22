@@ -32,6 +32,15 @@ export class ContractsService {
         });
     }
 
+    async findArtistHistory(artistId: string): Promise<ContractRecord[]> {
+        const snapshot = await this.db.collection(COLLECTION).where('artistId', '==', artistId).get();
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ContractRecord)).sort((a, b) => {
+            const at = a.createdAt?.toMillis?.() ?? 0;
+            const bt = b.createdAt?.toMillis?.() ?? 0;
+            return bt - at;
+        });
+    }
+
     async findById(id: string, userId: string): Promise<ContractRecord> {
         const doc = await this.db.collection(COLLECTION).doc(id).get();
         if (!doc.exists) throw new Error('Contract not found');

@@ -65,12 +65,18 @@ export class DashboardService {
         // Generate chart data for the last 7 days (as shown in image)
         const visitsChartData = this.generateWeeklyVisits(visitsHistory);
 
+        // 4. Next Event (upcoming)
+        const nextEvent = allContracts
+            .filter(c => c.eventDetails.date.toDate() >= now && c.status === ContractStatus.ACCEPTED)
+            .sort((a, b) => a.eventDetails.date.toMillis() - b.eventDetails.date.toMillis())[0];
+
         return {
             totalEvents: totalEventsCurr,
             eventsGrowthPercent: Math.round(eventsGrowthPercent),
             totalBalance,
             profileVisitsTotal,
-            visitsChartData
+            visitsChartData,
+            nextEvent
         };
     }
 

@@ -14,13 +14,20 @@ router.use(authMiddleware);
  * @swagger
  * /contracts/my-history:
  *   get:
- *     summary: Get client's contracts and events history
+ *     summary: Obtener historial de contratos del cliente
  *     tags: [Contracts]
- *     responses:
- *       200:
- *         description: List of contracts
  */
 router.get('/my-history', roleGuard(UserRoleEnum.CLIENTE), (req, res) => controller.getMyHistory(req, res));
+
+/**
+ * @swagger
+ * /contracts/artist-history:
+ *   get:
+ *     summary: Obtener historial de contratos del artista
+ *     tags: [Contracts]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.get('/artist-history', roleGuard(UserRoleEnum.ARTISTA), (req, res) => controller.getArtistHistory(req, res));
 
 /**
  * @swagger

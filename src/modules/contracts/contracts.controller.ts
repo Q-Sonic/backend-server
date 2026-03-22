@@ -13,6 +13,13 @@ export class ContractsController {
         sendSuccess(res, history, 'Contracts history retrieved');
     }
 
+    async getArtistHistory(req: AuthRequest, res: Response) {
+        if (!req.user) return sendError({ res, error: 'Unauthorized', statusCode: 401 });
+
+        const history = await contractsService.findArtistHistory(req.user.uid);
+        sendSuccess(res, history, 'Artist contracts history retrieved');
+    }
+
     async getById(req: AuthRequest, res: Response) {
         if (!req.user) return sendError({ res, error: 'Unauthorized', statusCode: 401 });
 

@@ -118,16 +118,6 @@ export class AuthService {
 
   /**
    * Login/Registro con Google OAuth.
-   *
-   * Flujo:
-   *  1. El cliente obtiene un idToken de Google a través del Firebase Client SDK
-   *     (signInWithPopup / signInWithRedirect con GoogleAuthProvider).
-   *  2. Envía ese idToken al backend via POST /api/auth/google.
-   *  3. El backend verifica el token con Firebase Admin, crea/actualiza el usuario
-   *     en Firestore (role por defecto = CLIENTE si es nuevo), y devuelve
-   *     un customToken firmado + datos del usuario.
-   *  4. El cliente usa ese customToken para llamar a
-   *     `signInWithCustomToken(auth, customToken)` y obtener un idToken de sesión.
    */
   async loginWithGoogle(googleIdToken: string): Promise<GoogleLoginResponse> {
     // 1. Verificar el idToken de Google con Firebase Admin
@@ -183,7 +173,6 @@ export class AuthService {
     }
 
     // 2. Generar un customToken firmado por el servidor
-    // El cliente lo usará con signInWithCustomToken() para iniciar sesión
     const customToken = await this.auth.createCustomToken(uid, {
       role: userRecord.role,
     });
@@ -228,7 +217,6 @@ export class AuthService {
    * Genera un código de 6 dígitos para recuperar contraseña.
    */
   async forgotPassword(email: string): Promise<PasswordResetRecord> {
-    // 1. Verificar si el usuario existe (opcional dependiendo de política de seguridad)
     try {
       await this.auth.getUserByEmail(email);
     } catch (error) {
@@ -252,7 +240,6 @@ export class AuthService {
       createdAt: now,
     };
 
-    // Usamos el email como ID del documento para que sea único por solicitud activa
     await this.db.collection('passwordResets').doc(email).set(resetRecord);
 
     return resetRecord;
@@ -308,15 +295,12 @@ export class AuthService {
       throw new Error('El código ha expirado');
     }
 
-    // 1. Obtener UID por email
     const user = await this.auth.getUserByEmail(email);
 
-    // 2. Actualizar contraseña en Firebase Auth
     await this.auth.updateUser(user.uid, {
       password: newPassword
     });
 
-    // 3. Eliminar el registro de reset para que no se use de nuevo
     await this.db.collection('passwordResets').doc(email).delete();
   }
 }

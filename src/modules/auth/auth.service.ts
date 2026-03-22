@@ -4,6 +4,7 @@ import { getEnv } from '../../config/env';
 import { UserRoleEnum } from '../../enum/roles.enum';
 import { VERIFICATION_CODE_EXPIRY_HOURS, VERIFICATION_CODE_LENGTH } from '../../config/verification.config';
 import * as crypto from 'crypto';
+import { Logger } from '../../utils/logger.util';
 
 interface RegisterInput {
   email: string;
@@ -54,6 +55,7 @@ export class AuthService {
     };
 
     await this.db.collection('users').doc(firebaseUser.uid).set(userRecord);
+    Logger.success(`User registered: ${input.email} [UID: ${firebaseUser.uid}]`);
 
     // 4. Generar código de verificación
     const verification = await this.generateEmailVerificationCode(firebaseUser.uid, input.email);
@@ -90,8 +92,11 @@ export class AuthService {
 
     if (!response.ok) {
       const errorMsg = data.error?.message || 'Login failed';
+      Logger.error(`Login failed for ${email}: ${errorMsg}`);
       throw new Error(`Credenciales inválidas: ${errorMsg}`);
     }
+
+    Logger.auth(`Login successful for ${email}`);
 
     // Rol desde Firestore (fuente de verdad). El JWT no incluye custom claims hasta el próximo login/refresh.
     const userDoc = await this.db.collection('users').doc(data.localId).get();
@@ -240,7 +245,9 @@ export class AuthService {
       createdAt: now,
     };
 
+    // Usamos el email como ID del documento para que sea único por solicitud activa
     await this.db.collection('passwordResets').doc(email).set(resetRecord);
+    Logger.info(`Password reset code generated for ${email}: ${code}`);
 
     return resetRecord;
   }

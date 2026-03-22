@@ -15,10 +15,12 @@ import eventsRoutes from './modules/events/events.routes';
 import { errorMiddleware } from './middleware/error.middleware';
 import { sendSuccess } from './utils/response.util';
 import { setupSwagger } from './config/swagger';
+import { requestLoggerMiddleware } from './middleware/request-logger.middleware';
 
 const app = express();
 
-// ─── Security & Parsing Middleware ───────────────────────────────────────────
+// ─── Logging & Security ──────────────────────────────────────────────────────
+app.use(requestLoggerMiddleware);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());

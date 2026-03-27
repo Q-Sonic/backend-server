@@ -42,6 +42,15 @@ export class ArtistServicesService {
         return { id: doc.id, ...data };
     }
 
+    private async syncMinPrice(artistId: string): Promise<void> {
+        const services = await this.findAllByArtistId(artistId);
+        const minPrice = services.length > 0 
+            ? Math.min(...services.map(s => s.price))
+            : 0;
+        
+        await this.db.collection('artist_profiles').doc(artistId).set({ minPrice }, { merge: true });
+    }
+
     async create(artistId: string, input: CreateArtistServiceInput): Promise<ArtistServiceRecord> {
         const now = admin.firestore.Timestamp.now();
         const record = {
@@ -49,11 +58,14 @@ export class ArtistServicesService {
             name: input.name.trim(),
             price: Number(input.price),
             description: (input.description ?? '').trim(),
+            duration: (input.duration ?? '').trim(),
+            features: input.features ?? [],
             createdAt: now,
             updatedAt: now,
         };
 
         const ref = await this.db.collection(COLLECTION).add(record);
+        await this.syncMinPrice(artistId);
         return { id: ref.id, ...record } as ArtistServiceRecord;
     }
 
@@ -75,8 +87,11 @@ export class ArtistServicesService {
         if (input.name !== undefined) updates.name = input.name.trim();
         if (input.price !== undefined) updates.price = Number(input.price);
         if (input.description !== undefined) updates.description = input.description.trim();
+        if (input.duration !== undefined) updates.duration = input.duration.trim();
+        if (input.features !== undefined) updates.features = input.features;
 
         await ref.update(updates);
+        await this.syncMinPrice(artistId);
         const updated = await ref.get();
         return { id: updated.id, ...updated.data() } as ArtistServiceRecord;
     }
@@ -89,5 +104,6 @@ export class ArtistServicesService {
         if (data.artistId !== artistId) throw new Error('Artist service not found');
 
         await this.db.collection(COLLECTION).doc(id).delete();
+        await this.syncMinPrice(artistId);
     }
 }

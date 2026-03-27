@@ -25,10 +25,42 @@ export class ArtistProfilesService {
         return { uid: doc.id, ...doc.data() } as ArtistProfileRecord;
     }
 
-    /** List all artist profiles (for client/admin browse). */
-    async listAll(): Promise<ArtistProfileRecord[]> {
-        const snapshot = await this.db.collection(COLLECTION).get();
-        return snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() } as ArtistProfileRecord));
+    /** List and filter artist profiles (for client/admin browse). */
+    async listAll(filters?: { 
+        genre?: string; 
+        city?: string; 
+        minPrice?: number; 
+        maxPrice?: number; 
+        search?: string;
+    }): Promise<ArtistProfileRecord[]> {
+        let query: admin.firestore.Query = this.db.collection(COLLECTION);
+
+        if (filters?.genre) {
+            query = query.where('genre', '==', filters.genre);
+        }
+        if (filters?.city) {
+            query = query.where('city', '==', filters.city);
+        }
+        if (filters?.minPrice !== undefined) {
+            query = query.where('minPrice', '>=', filters.minPrice);
+        }
+        if (filters?.maxPrice !== undefined) {
+            query = query.where('minPrice', '<=', filters.maxPrice);
+        }
+
+        const snapshot = await query.get();
+        let profiles = snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() } as ArtistProfileRecord));
+
+        // Basic text search in memory for now if search string is provided
+        if (filters?.search) {
+            const s = filters.search.toLowerCase();
+            profiles = profiles.filter(p => 
+                p.biography.toLowerCase().includes(s) || 
+                (p as any).displayName?.toLowerCase().includes(s)
+            );
+        }
+
+        return profiles;
     }
 
     async createOrUpdate(
@@ -52,6 +84,7 @@ export class ArtistProfilesService {
 
         const data = {
             biography: (input.biography ?? existing?.biography ?? '').trim(),
+            genre: (input.genre ?? existing?.genre ?? '').trim(),
             socialNetworks,
             photo: (input.photo ?? existing?.photo ?? '').trim(),
             city: (input.city ?? existing?.city ?? '').trim(),

@@ -58,14 +58,6 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 }
 
-/**
- * POST /api/auth/google
- *
- * Recibe el idToken de Google obtenido por el cliente con Firebase Client SDK
- * (signInWithPopup / signInWithRedirect + GoogleAuthProvider).
- * El backend lo verifica, crea/actualiza el usuario en Firestore y devuelve
- * un customToken que el cliente usa para iniciar sesión con Firebase.
- */
 export async function googleLogin(req: Request, res: Response): Promise<void> {
     try {
         const { idToken } = req.body as { idToken?: string };
@@ -83,12 +75,6 @@ export async function googleLogin(req: Request, res: Response): Promise<void> {
     }
 }
 
-/**
- * POST /api/auth/verify-email
- *
- * (Stub) Verifica el código de 6 dígitos enviado por el usuario.
- * Por ahora devuelve 501 Not Implemented ya que estamos en fase de diseño.
- */
 export async function verifyEmail(req: Request, res: Response): Promise<void> {
     try {
         const { uid, code } = req.body as { uid?: string; code?: string };
@@ -98,7 +84,6 @@ export async function verifyEmail(req: Request, res: Response): Promise<void> {
             return;
         }
 
-        // TODO: Implementar validación lógica real
         res.status(501).json({
             success: false,
             message: 'Email verification logic is not yet implemented (STUB)',
@@ -110,9 +95,6 @@ export async function verifyEmail(req: Request, res: Response): Promise<void> {
     }
 }
 
-/**
- * POST /api/auth/forgot-password
- */
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
     try {
         const { email } = req.body as { email?: string };
@@ -124,24 +106,18 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 
         const result = await authService.forgotPassword(email);
 
-        // DEV MODE: Retornamos el código en el JSON para pruebas en consola del front
         sendSuccess(res, {
             email: result.email,
             expiresAt: result.expiresAt.toDate(),
-            code: result.code, // Solo para desarrollo
+            code: result.code,
             message: 'Si el correo existe, se enviará un código de verificación'
         }, 'Reset code generated');
     } catch (err) {
-        // Por seguridad, en prod se podría responder éxito igual para no revelar si el email existe.
-        // Aquí seguimos la petición del usuario de reportar lo que pasa.
         const message = err instanceof Error ? err.message : 'Error generating reset code';
         sendError({ res, error: message, statusCode: 400 });
     }
 }
 
-/**
- * POST /api/auth/verify-reset-code
- */
 export async function verifyResetCode(req: Request, res: Response): Promise<void> {
     try {
         const { email, code } = req.body as { email?: string; code?: string };
@@ -159,9 +135,6 @@ export async function verifyResetCode(req: Request, res: Response): Promise<void
     }
 }
 
-/**
- * POST /api/auth/reset-password
- */
 export async function resetPassword(req: Request, res: Response): Promise<void> {
     try {
         const { email, code, newPassword } = req.body as { email?: string; code?: string; newPassword?: string };

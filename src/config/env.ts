@@ -17,21 +17,11 @@ export function getEnv(): EnvConfig {
         FIREBASE_WEB_API_KEY,
     } = process.env;
 
-    if (!FIREBASE_SERVICE_ACCOUNT_BASE64) {
-        throw new Error('Missing FIREBASE_SERVICE_ACCOUNT_BASE64 env variable');
-    }
-    if (!FIREBASE_STORAGE_BUCKET) {
-        throw new Error('Missing FIREBASE_STORAGE_BUCKET env variable');
-    }
-    if (!FIREBASE_WEB_API_KEY) {
-        throw new Error('Missing FIREBASE_WEB_API_KEY env variable');
-    }
-
     return {
         PORT: PORT ? parseInt(PORT, 10) : 3000,
         NODE_ENV: NODE_ENV ?? 'development',
-        FIREBASE_SERVICE_ACCOUNT_BASE64,
-        FIREBASE_STORAGE_BUCKET,
-        FIREBASE_WEB_API_KEY,
+        FIREBASE_SERVICE_ACCOUNT_BASE64: FIREBASE_SERVICE_ACCOUNT_BASE64 || '',
+        FIREBASE_STORAGE_BUCKET: FIREBASE_STORAGE_BUCKET || '',
+        FIREBASE_WEB_API_KEY: FIREBASE_WEB_API_KEY || '',
     };
 }

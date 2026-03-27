@@ -42,12 +42,34 @@ export class EventsService {
             });
     }
 
-    async getExtendedEventDetail(contractId: string, artistUid: string): Promise<ExtendedContractDetail> {
+    async getClientCalendarEvents(clientUid: string, startDate?: Date, endDate?: Date): Promise<ContractRecord[]> {
+        let query = this.db.collection(CONTRACTS_COLLECTION)
+            .where('clientId', '==', clientUid);
+
+        if (startDate) {
+            query = query.where('eventDetails.date', '>=', admin.firestore.Timestamp.fromDate(startDate));
+        }
+        if (endDate) {
+            query = query.where('eventDetails.date', '<=', admin.firestore.Timestamp.fromDate(endDate));
+        }
+
+        const snapshot = await query.get();
+        return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ContractRecord))
+            .sort((a, b) => {
+                const at = a.eventDetails?.date?.toMillis?.() || 0;
+                const bt = b.eventDetails?.date?.toMillis?.() || 0;
+                return at - bt;
+            });
+    }
+
+    async getExtendedEventDetail(contractId: string, userUid: string): Promise<ExtendedContractDetail> {
         const doc = await this.db.collection(CONTRACTS_COLLECTION).doc(contractId).get();
         if (!doc.exists) throw new Error('Contract not found');
 
         const data = doc.data() as ContractRecord;
-        if (data.artistId !== artistUid) throw new Error('Unauthorized access to this event');
+        if (data.artistId !== userUid && data.clientId !== userUid) {
+            throw new Error('Unauthorized access to this event');
+        }
 
         const detail = { ...data, id: doc.id } as ExtendedContractDetail;
 

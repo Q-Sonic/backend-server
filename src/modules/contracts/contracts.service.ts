@@ -6,6 +6,8 @@ import { StorageService } from '../storage/storage.service';
 import { UsersService } from '../users/users.service';
 import { ArtistProfilesService } from '../artist-profiles/artist-profiles.service';
 
+import { Logger } from '../../utils/logger.util';
+
 const COLLECTION = 'contracts';
 
 export class ContractsService {
@@ -25,6 +27,15 @@ export class ContractsService {
 
     async findClientHistory(clientId: string): Promise<ContractRecord[]> {
         const snapshot = await this.db.collection(COLLECTION).where('clientId', '==', clientId).get();
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ContractRecord)).sort((a, b) => {
+            const at = a.createdAt?.toMillis?.() ?? 0;
+            const bt = b.createdAt?.toMillis?.() ?? 0;
+            return bt - at;
+        });
+    }
+
+    async findArtistHistory(artistId: string): Promise<ContractRecord[]> {
+        const snapshot = await this.db.collection(COLLECTION).where('artistId', '==', artistId).get();
         return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ContractRecord)).sort((a, b) => {
             const at = a.createdAt?.toMillis?.() ?? 0;
             const bt = b.createdAt?.toMillis?.() ?? 0;
@@ -72,6 +83,7 @@ export class ContractsService {
         };
 
         const ref = await this.db.collection(COLLECTION).add(record);
+        Logger.success(`Contract created: ${ref.id} for artist ${input.artistId} ($${input.totalAmount})`);
         return { id: ref.id, ...record } as ContractRecord;
     }
 
@@ -119,6 +131,7 @@ export class ContractsService {
         }
 
         await ref.update(updateData);
+        Logger.info(`Contract ${id} status changed: ${data.status} -> ${status}`);
         const updated = await ref.get();
         return { id: updated.id, ...updated.data() } as ContractRecord;
     }
@@ -154,6 +167,7 @@ export class ContractsService {
             'financials.paymentStatus': newPaymentStatus,
             updatedAt: now,
         });
+        Logger.success(`Payment added to contract ${id}: $${newPayment.amount} (Total paid: $${updatedPaidAmount})`);
 
         const updated = await ref.get();
         return { id: updated.id, ...updated.data() } as ContractRecord;

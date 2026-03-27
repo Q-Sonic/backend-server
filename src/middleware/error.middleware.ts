@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { sendError } from '../utils/response.util';
+import { Logger } from '../utils/logger.util';
 
 export function errorMiddleware(
     err: Error,
-    _req: Request,
+    req: Request,
     res: Response,
     _next: NextFunction
 ): void {
@@ -14,6 +15,9 @@ export function errorMiddleware(
             return;
         }
     }
-    console.error('❌ Unhandled error:', err.message);
+    
+    // Log the full stack error for debugging
+    Logger.error(`❌ Global error caught at ${req.method} ${req.url}`, err);
+
     sendError({ res, error: err.message || 'Internal Server Error', statusCode: 500 });
 }

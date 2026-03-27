@@ -21,16 +21,45 @@ function getUid(req: AuthRequest): string {
     return uid;
 }
 
-/** GET list: all artist profiles with displayName (cliente, admin, organizacion, soporte) */
+/** GET list: all artist profiles with filters (cliente, admin, organizacion, soporte) */
 export async function listArtistProfiles(req: AuthRequest, res: Response): Promise<void> {
     try {
-        const profiles = await artistProfilesService.listAll();
+        const { genre, city, minPrice, maxPrice, search, availableToday } = req.query;
+
+        const filters = {
+            genre: typeof genre === 'string' ? genre : undefined,
+            city: typeof city === 'string' ? city : undefined,
+            minPrice: minPrice ? Number(minPrice) : undefined,
+            maxPrice: maxPrice ? Number(maxPrice) : undefined,
+            search: typeof search === 'string' ? search : undefined,
+        };
+
+        let profiles = await artistProfilesService.listAll(filters);
         const uids = profiles.map((p) => p.uid);
         const displayNames = await usersService.getDisplayNamesByUids(uids);
-        const list = profiles.map((p) => ({
+
+        // 1. Enrich with display name
+        let list = profiles.map((p) => ({
             ...p,
             displayName: displayNames[p.uid] ?? '',
         }));
+
+        // 2. Filter by "Available Today" if needed
+        if (availableToday === 'true') {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const filtered = [];
+            for (const item of list) {
+                const availability = await artistProfilesService.getAvailability(item.uid);
+                const isUnavailable = availability.blocked.includes(todayStr) || 
+                                    availability.reserved.includes(todayStr) || 
+                                    availability.pending.includes(todayStr);
+                if (!isUnavailable) {
+                    filtered.push(item);
+                }
+            }
+            list = filtered;
+        }
+
         sendSuccess(res, list);
     } catch (err: any) {
         sendError({
@@ -221,6 +250,7 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
 
         const profile = await artistProfilesService.createOrUpdate(uid, {
             biography: typeof body.biography === 'string' ? body.biography : undefined,
+            genre: typeof body.genre === 'string' ? body.genre : undefined,
             socialNetworks: parseSocialNetworks(body),
             photo: photoUrl,
             city: typeof body.city === 'string' ? body.city : undefined,

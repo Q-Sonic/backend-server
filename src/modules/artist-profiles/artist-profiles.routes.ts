@@ -39,7 +39,30 @@ router.get('/me', roleGuard(UserRoleEnum.ARTISTA), getMyProfile);
  * /artist-profiles:
  *   get:
  *     tags: [Artist Profile]
- *     summary: Listar todos los perfiles de artistas
+ *     summary: Listar y filtrar perfiles de artistas
+ *     parameters:
+ *       - name: genre
+ *         in: query
+ *         schema: { type: string }
+ *         description: Filtrar por género musical
+ *       - name: city
+ *         in: query
+ *         schema: { type: string }
+ *         description: Filtrar por ciudad
+ *       - name: minPrice
+ *         in: query
+ *         schema: { type: number }
+ *       - name: maxPrice
+ *         in: query
+ *         schema: { type: number }
+ *       - name: search
+ *         in: query
+ *         schema: { type: string }
+ *         description: Búsqueda por nombre o biografía
+ *       - name: availableToday
+ *         in: query
+ *         schema: { type: string, enum: [true, false] }
+ *         description: Mostrar solo artistas disponibles hoy
  */
 router.get('/', listArtistProfiles);
 

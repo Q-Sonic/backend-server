@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const artistProfileSchema = z.object({
     body: z.object({
         biography: z.string().max(5000, 'La biografía no puede exceder 5000 caracteres').optional(),
+        genre: z.string().max(50).optional(),
         city: z.string().max(100).optional(),
         instagram: z.string().url('URL de Instagram inválida').or(z.literal('')).optional(),
         facebook: z.string().url('URL de Facebook inválida').or(z.literal('')).optional(),

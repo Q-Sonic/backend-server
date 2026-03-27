@@ -155,6 +155,10 @@ export interface ArtistProfileRecord {
         streamUrl: string;
         coverUrl?: string;
     };
+    /** Artist's main genre (e.g. 'Pop', 'Salsa', 'Rock') */
+    genre?: string;
+    /** Minimum price for services (for search indexing) */
+    minPrice?: number;
     /** Link to technical rider (PDF) */
     technicalRiderUrl?: string;
     /** Gallery media URLs (images, audio, video). */
@@ -179,6 +183,7 @@ export interface DashboardStats {
 
 export interface CreateOrUpdateArtistProfileInput {
     biography?: string;
+    genre?: string;
     socialNetworks?: SocialNetworks;
     photo?: string;
     city?: string;

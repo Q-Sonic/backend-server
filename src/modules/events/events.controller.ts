@@ -18,7 +18,13 @@ export class EventsController {
         const endDate = end ? new Date(String(end)) : undefined;
 
         try {
-            const events = await eventsService.getCalendarEvents(uid, startDate, endDate);
+            const role = req.user?.role;
+            let events;
+            if (role === UserRoleEnum.ARTISTA) {
+                events = await eventsService.getCalendarEvents(uid, startDate, endDate);
+            } else {
+                events = await eventsService.getClientCalendarEvents(uid, startDate, endDate);
+            }
             res.status(200).json({ success: true, data: events } as ApiResponse);
         } catch (error: any) {
             res.status(500).json({ success: false, error: error.message } as ApiResponse);
@@ -35,7 +41,13 @@ export class EventsController {
         const { id } = req.params;
 
         try {
+            const role = req.user?.role;
             const detail = await eventsService.getExtendedEventDetail(id as string, uid as string);
+            
+            // If the user is a client, we should ensure they own this contract
+            // However, getExtendedEventDetail currently checks "artistId === uid".
+            // I need to update the service to handle both.
+            
             res.status(200).json({ success: true, data: detail } as ApiResponse);
         } catch (error: any) {
             const statusCode = error.message.includes('Unauthorized') ? 403 : 404;

@@ -9,7 +9,7 @@ const controller = new EventsController();
 
 // 🔒 Artist only routes
 router.use(authMiddleware);
-router.use(roleGuard(UserRoleEnum.ARTISTA));
+// roleGuard removed from global level to allow multiple roles (Artist, Cliente, etc.)
 
 /**
  * @swagger

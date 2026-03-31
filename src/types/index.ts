@@ -90,6 +90,19 @@ export interface ArtistServiceRecord {
     features?: string[];
     /** Rider URL (PDF in Storage) */
     riderUrl?: string;
+    /** Cover image URL for service card/modal */
+    imageUrl?: string;
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export interface ArtistSongRecord {
+    id: string;
+    artistId: string;
+    title: string;
+    audioUrl: string;
+    coverUrl?: string;
+    isFeatured?: boolean;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -100,6 +113,7 @@ export interface CreateArtistServiceInput {
     description: string;
     duration?: string;
     features?: string[];
+    imageUrl?: string;
 }
 
 export type UpdateArtistServiceInput = Partial<CreateArtistServiceInput>;
@@ -136,8 +150,16 @@ export interface ArtistProfileMediaItem {
     url: string;
     type: 'image' | 'audio' | 'video';
     name?: string;
+    /** Optional cover image for audio songs */
+    coverUrl?: string;
     /** Category for gallery filtering (e.g., 'Conciertos', 'Backstage', 'Fans') */
     category?: string;
+}
+
+export interface ArtistSongItem {
+    url: string;
+    title: string;
+    coverUrl?: string;
 }
 
 export interface ArtistProfileRecord {
@@ -163,6 +185,8 @@ export interface ArtistProfileRecord {
     technicalRiderUrl?: string;
     /** Gallery media URLs (images, audio, video). */
     media?: ArtistProfileMediaItem[];
+    /** Songs managed independently from gallery. */
+    songs?: ArtistSongItem[];
     /** Stats for dashboard */
     totalVisits?: number;
     /** Map of date (YYYY-MM-DD) -> count */
@@ -188,6 +212,7 @@ export interface CreateOrUpdateArtistProfileInput {
     photo?: string;
     city?: string;
     media?: ArtistProfileMediaItem[];
+    songs?: ArtistSongItem[];
     blockedDates?: string[];
     featuredSong?: {
         title: string;

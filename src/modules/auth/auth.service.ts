@@ -123,9 +123,18 @@ export class AuthService {
 
   /**
    * Login/Registro con Google OAuth.
+   * Proceso lógico:
+   * 1. Se valida el token que el cliente obtuvo del SDK de Google.
+   * 2. Si el token es válido, extraemos uid y email.
+   * 3. Verificamos si el usuario ya existe en Firestore.
+   * 4. Si es nuevo, creamos el registro con rol 'cliente' por defecto.
+   * 5. Si ya existe, actualizamos su información de perfil (foto, nombre).
+   * 6. Generamos un Custom Token de Firebase. Este token es el que el cliente usará
+   *    para autenticarse con el SDK de Firebase (signInWithCustomToken) y recibir
+   *    automáticamente sus Custom Claims (roles).
    */
   async loginWithGoogle(googleIdToken: string): Promise<GoogleLoginResponse> {
-    // 1. Verificar el idToken de Google con Firebase Admin
+    // 1. Verificar el idToken de Google con Firebase Admin (Autenticidad del origen)
     let decoded: admin.auth.DecodedIdToken;
     try {
       decoded = await this.auth.verifyIdToken(googleIdToken);
@@ -146,8 +155,9 @@ export class AuthService {
     let userRecord: UserRecord;
     let isNewUser = false;
 
+    // Lógica de Sincronización: Siempre mantenemos Firestore al día con los datos de Google
     if (userDoc.exists) {
-      // Usuario existente → actualizamos displayName y photo si cambiaron
+      // Usuario existente → actualizamos displayName y photo si cambiaron en su cuenta de Google
       const existing = userDoc.data() as UserRecord;
       const updates: Partial<UserRecord> = { updatedAt: now };
       if (name && name !== existing.displayName) updates.displayName = name;
@@ -156,7 +166,8 @@ export class AuthService {
       await userRef.update(updates);
       userRecord = { ...existing, ...updates };
     } else {
-      // Nuevo usuario → crear registro con rol CLIENTE por defecto
+      // Nuevo usuario → creamos el registro inicial. El rol por defecto es CLIENTE.
+      // Si el usuario quisiera ser ARTISTA, debería pasar por un flujo de upgrade posterior.
       isNewUser = true;
       const role: UserRole = UserRoleEnum.CLIENTE;
 
@@ -166,18 +177,19 @@ export class AuthService {
         displayName: name ?? email.split('@')[0],
         role,
         photoURL: picture ?? undefined,
-        emailVerified: true, // Google accounts are considered verified
+        emailVerified: true, // Las cuentas de Google se consideran verificadas por confianza delegada
         createdAt: now,
         updatedAt: now,
       };
 
       await userRef.set(userRecord);
 
-      // Asignar custom claim de rol en Firebase Auth
+      // Sincronización con Firebase Auth: Inyectamos el ROL en los Custom Claims para seguridad en el front
       await this.auth.setCustomUserClaims(uid, { role });
     }
 
-    // 2. Generar un customToken firmado por el servidor
+    // Generar Custom Token: Este token es EFÍMERO y seguro.
+    // Solo sirve para que el cliente lo use UNA VEZ para recibir su sesión de Firebase.
     const customToken = await this.auth.createCustomToken(uid, {
       role: userRecord.role,
     });

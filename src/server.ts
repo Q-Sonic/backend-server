@@ -1,6 +1,5 @@
-import 'dotenv/config';
-import { initFirebase } from './config/firebase';
 import { getEnv } from './config/env';
+import { initFirebase } from './config/firebase';
 import app from './app';
 
 async function bootstrap(): Promise<void> {

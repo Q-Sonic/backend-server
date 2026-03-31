@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import {
     listMyServices,
     getServiceById,
@@ -10,8 +11,13 @@ import {
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { roleGuard } from '../../middleware/role.middleware';
 import { UserRoleEnum } from '../../enum/roles.enum';
+import { MAX_IMAGE_SIZE } from '../../helper/storage';
 
 const router = Router();
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_IMAGE_SIZE },
+});
 
 router.use(authMiddleware);
 
@@ -69,7 +75,7 @@ router.get('/:id', getServiceById);
  *               duration: { type: string, example: '60-90 min' }
  *               features: { type: array, items: { type: string }, example: ['Equipo de sonido incluido', 'Luces'] }
  */
-router.post('/', roleGuard(UserRoleEnum.ARTISTA), createService);
+router.post('/', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), createService);
 
 /**
  * @swagger
@@ -90,7 +96,7 @@ router.post('/', roleGuard(UserRoleEnum.ARTISTA), createService);
  *               duration: { type: string }
  *               features: { type: array, items: { type: string } }
  */
-router.put('/:id', roleGuard(UserRoleEnum.ARTISTA), updateService);
+router.put('/:id', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), updateService);
 
 /**
  * @swagger

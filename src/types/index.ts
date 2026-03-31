@@ -90,6 +90,8 @@ export interface ArtistServiceRecord {
     features?: string[];
     /** Rider URL (PDF in Storage) */
     riderUrl?: string;
+    /** Cover image URL for service card/modal */
+    imageUrl?: string;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -100,6 +102,7 @@ export interface CreateArtistServiceInput {
     description: string;
     duration?: string;
     features?: string[];
+    imageUrl?: string;
 }
 
 export type UpdateArtistServiceInput = Partial<CreateArtistServiceInput>;

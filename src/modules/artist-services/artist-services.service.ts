@@ -4,14 +4,18 @@ import {
     CreateArtistServiceInput,
     UpdateArtistServiceInput,
 } from '../../types';
+import { StorageService } from '../storage/storage.service';
+import { extractFilePathFromStorageUrl } from '../../helper/storage';
 
 const COLLECTION = 'artist_services';
 
 export class ArtistServicesService {
     private db: admin.firestore.Firestore;
+    private storageService: StorageService;
 
     constructor() {
         this.db = getFirestore();
+        this.storageService = new StorageService();
     }
 
     async findAllByArtistId(artistId: string): Promise<ArtistServiceRecord[]> {
@@ -60,6 +64,7 @@ export class ArtistServicesService {
             description: (input.description ?? '').trim(),
             duration: (input.duration ?? '').trim(),
             features: input.features ?? [],
+            imageUrl: (input.imageUrl ?? '').trim(),
             createdAt: now,
             updatedAt: now,
         };
@@ -89,6 +94,7 @@ export class ArtistServicesService {
         if (input.description !== undefined) updates.description = input.description.trim();
         if (input.duration !== undefined) updates.duration = input.duration.trim();
         if (input.features !== undefined) updates.features = input.features;
+        if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl.trim();
 
         await ref.update(updates);
         await this.syncMinPrice(artistId);
@@ -100,8 +106,19 @@ export class ArtistServicesService {
         const doc = await this.db.collection(COLLECTION).doc(id).get();
         if (!doc.exists) throw new Error(`Artist service ${id} not found`);
 
-        const data = doc.data() as { artistId: string };
+        const data = doc.data() as { artistId: string; imageUrl?: string };
         if (data.artistId !== artistId) throw new Error('Artist service not found');
+
+        if (data.imageUrl) {
+            const oldPath = extractFilePathFromStorageUrl(data.imageUrl);
+            if (oldPath) {
+                try {
+                    await this.storageService.deleteFile(oldPath);
+                } catch {
+                    // Ignore cleanup errors during delete flow.
+                }
+            }
+        }
 
         await this.db.collection(COLLECTION).doc(id).delete();
         await this.syncMinPrice(artistId);

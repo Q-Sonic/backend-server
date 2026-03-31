@@ -130,12 +130,14 @@ export async function getMyProfile(req: AuthRequest, res: Response): Promise<voi
 }
 
 function parseSocialNetworks(body: Record<string, unknown>): Record<string, string> | undefined {
-    if (body.socialNetworks && typeof body.socialNetworks === 'object') {
-        return body.socialNetworks as Record<string, string>;
-    }
     const keys = ['instagram', 'facebook', 'twitter', 'youtube', 'tiktok'];
+    const fromObject =
+        body.socialNetworks && typeof body.socialNetworks === 'object'
+            ? (body.socialNetworks as Record<string, unknown>)
+            : undefined;
     const out: Record<string, string> = {};
     for (const k of keys) {
+        if (fromObject && typeof fromObject[k] === 'string') out[k] = fromObject[k] as string;
         if (typeof body[k] === 'string') out[k] = body[k] as string;
     }
     return Object.keys(out).length ? out : undefined;

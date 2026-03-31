@@ -5,6 +5,13 @@ export const artistProfileSchema = z.object({
         biography: z.string().max(5000, 'La biografía no puede exceder 5000 caracteres').optional(),
         genre: z.string().max(50).optional(),
         city: z.string().max(100).optional(),
+        socialNetworks: z.object({
+            instagram: z.string().url('URL de Instagram inválida').or(z.literal('')).optional(),
+            facebook: z.string().url('URL de Facebook inválida').or(z.literal('')).optional(),
+            twitter: z.string().url('URL de Twitter inválida').or(z.literal('')).optional(),
+            youtube: z.string().url('URL de Youtube inválida').or(z.literal('')).optional(),
+            tiktok: z.string().url('URL de TikTok inválida').or(z.literal('')).optional(),
+        }).optional(),
         instagram: z.string().url('URL de Instagram inválida').or(z.literal('')).optional(),
         facebook: z.string().url('URL de Facebook inválida').or(z.literal('')).optional(),
         twitter: z.string().url('URL de Twitter inválida').or(z.literal('')).optional(),

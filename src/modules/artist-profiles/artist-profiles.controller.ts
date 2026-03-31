@@ -155,8 +155,26 @@ function parseMedia(value: unknown): ArtistProfileMediaItem[] | undefined {
                 url: String(raw.url),
                 type,
                 name: typeof raw.name === 'string' ? raw.name : undefined,
+                coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : undefined,
+                category: typeof raw.category === 'string' ? raw.category : undefined,
             });
         }
+    }
+    return out;
+}
+
+function parseSongs(value: unknown): { url: string; title: string; coverUrl?: string }[] | undefined {
+    if (!Array.isArray(value)) return undefined;
+    const out: { url: string; title: string; coverUrl?: string }[] = [];
+    for (const item of value) {
+        if (!item || typeof item !== 'object') continue;
+        const raw = item as Record<string, unknown>;
+        if (typeof raw.url !== 'string' || typeof raw.title !== 'string') continue;
+        out.push({
+            url: raw.url,
+            title: raw.title,
+            ...(typeof raw.coverUrl === 'string' ? { coverUrl: raw.coverUrl } : {}),
+        });
     }
     return out;
 }
@@ -191,6 +209,13 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
                 body.featuredSong = JSON.parse(body.featuredSong as string) as Record<string, string>;
             } catch {
                 body.featuredSong = undefined;
+            }
+        }
+        if (typeof body.songs === 'string') {
+            try {
+                body.songs = JSON.parse(body.songs as string) as unknown;
+            } catch {
+                body.songs = undefined;
             }
         }
 
@@ -249,6 +274,7 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
         }
 
         const media = parseMedia(body.media);
+        const songs = parseSongs(body.songs);
 
         const profile = await artistProfilesService.createOrUpdate(uid, {
             biography: typeof body.biography === 'string' ? body.biography : undefined,
@@ -257,6 +283,7 @@ export async function createOrUpdateProfile(req: AuthRequest, res: Response): Pr
             photo: photoUrl,
             city: typeof body.city === 'string' ? body.city : undefined,
             media,
+            songs,
             blockedDates: body.blockedDates as string[] | undefined,
             featuredSong: body.featuredSong as any,
             technicalRiderUrl,

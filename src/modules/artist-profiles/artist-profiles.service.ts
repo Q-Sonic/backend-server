@@ -78,6 +78,7 @@ export class ArtistProfilesService {
         };
 
         const media = input.media !== undefined ? input.media : existing?.media;
+        const songs = input.songs !== undefined ? input.songs : existing?.songs;
         const blockedDates = input.blockedDates !== undefined ? input.blockedDates : existing?.blockedDates;
         const featuredSong = input.featuredSong !== undefined ? input.featuredSong : existing?.featuredSong;
         const technicalRiderUrl = input.technicalRiderUrl !== undefined ? input.technicalRiderUrl : existing?.technicalRiderUrl;
@@ -89,6 +90,7 @@ export class ArtistProfilesService {
             photo: (input.photo ?? existing?.photo ?? '').trim(),
             city: (input.city ?? existing?.city ?? '').trim(),
             ...(media !== undefined && { media }),
+            ...(songs !== undefined && { songs }),
             ...(blockedDates !== undefined && { blockedDates }),
             ...(featuredSong !== undefined && { featuredSong }),
             ...(technicalRiderUrl !== undefined && { technicalRiderUrl }),

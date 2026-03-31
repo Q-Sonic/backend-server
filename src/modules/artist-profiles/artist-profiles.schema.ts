@@ -28,7 +28,13 @@ export const artistProfileSchema = z.object({
             url: z.string().url('URL de media inválida'),
             type: z.enum(['image', 'audio', 'video']),
             name: z.string().optional(),
+            coverUrl: z.string().url('URL de portada inválida').optional(),
             category: z.string().max(50).optional(),
+        })).optional(),
+        songs: z.array(z.object({
+            url: z.string().url('URL de canción inválida'),
+            title: z.string().min(1, 'Título de canción requerido'),
+            coverUrl: z.string().url('URL de portada inválida').optional(),
         })).optional(),
     }),
 });

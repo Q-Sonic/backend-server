@@ -28,6 +28,9 @@ router.use(authMiddleware);
  *     tags: [Artist Services]
  *     summary: Listar mis servicios (solo artistas)
  *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de servicios
  */
 router.get('/', listMyServices);
 
@@ -42,6 +45,9 @@ router.get('/', listMyServices);
  *         name: artistId
  *         required: true
  *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de servicios del artista
  */
 router.get('/all/:artistId', listAllServicesByArtistId);
 
@@ -51,6 +57,14 @@ router.get('/all/:artistId', listAllServicesByArtistId);
  *   get:
  *     tags: [Artist Services]
  *     summary: Obtener detalle de un servicio
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Detalle del servicio
  */
 router.get('/:id', getServiceById);
 
@@ -74,6 +88,9 @@ router.get('/:id', getServiceById);
  *               description: { type: string, example: 'Presentación completa...' }
  *               duration: { type: string, example: '60-90 min' }
  *               features: { type: array, items: { type: string }, example: ['Equipo de sonido incluido', 'Luces'] }
+ *     responses:
+ *       201:
+ *         description: Servicio creado
  */
 router.post('/', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), createService);
 
@@ -84,6 +101,11 @@ router.post('/', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), create
  *     tags: [Artist Services]
  *     summary: Actualizar un servicio existente
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
  *     requestBody:
  *       content:
  *         application/json:
@@ -95,6 +117,9 @@ router.post('/', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), create
  *               description: { type: string }
  *               duration: { type: string }
  *               features: { type: array, items: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Servicio actualizado
  */
 router.put('/:id', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), updateService);
 
@@ -105,6 +130,14 @@ router.put('/:id', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), upda
  *     tags: [Artist Services]
  *     summary: Eliminar un servicio
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       204:
+ *         description: Servicio eliminado
  */
 router.delete('/:id', roleGuard(UserRoleEnum.ARTISTA, UserRoleEnum.ADMIN), deleteService);
 

@@ -15,18 +15,28 @@ router.use(authMiddleware);
  * @swagger
  * /events/calendar:
  *   get:
- *     summary: Get calendar events for artist
+ *     summary: Obtener eventos del calendario para el artista
  *     tags: [Events]
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - name: start
  *         in: query
  *         schema: { type: 'string', format: 'date' }
+ *         description: Fecha inicio (YYYY-MM-DD)
  *       - name: end
  *         in: query
  *         schema: { type: 'string', format: 'date' }
+ *         description: Fecha fin (YYYY-MM-DD)
  *     responses:
  *       200:
- *         description: List of events
+ *         description: Lista de eventos para el calendario
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/ContractRecord' } }
  */
 router.get('/calendar', (req, res) => controller.getCalendar(req, res));
 
@@ -34,8 +44,9 @@ router.get('/calendar', (req, res) => controller.getCalendar(req, res));
  * @swagger
  * /events/{id}:
  *   get:
- *     summary: Get extended event detail (client info, download links)
+ *     summary: Obtener detalle extendido del evento (datos del cliente, links de descarga)
  *     tags: [Events]
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - name: id
  *         in: path
@@ -43,7 +54,7 @@ router.get('/calendar', (req, res) => controller.getCalendar(req, res));
  *         schema: { type: 'string' }
  *     responses:
  *       200:
- *         description: Extended event detail
+ *         description: Detalle extendido del evento
  */
 router.get('/:id', (req, res) => controller.getDetail(req, res));
 

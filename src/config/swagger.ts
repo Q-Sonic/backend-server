@@ -86,6 +86,17 @@ const options: swaggerJsdoc.Options = {
                         role: { type: 'string', example: 'cliente' },
                     },
                 },
+                ArtistSongRecord: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', example: 'songId123' },
+                        artistId: { type: 'string', example: 'abc123uid' },
+                        title: { type: 'string', example: 'My Awesome Song' },
+                        audioUrl: { type: 'string', example: 'https://storage...' },
+                        coverUrl: { type: 'string', example: 'https://storage...' },
+                        isFeatured: { type: 'boolean', example: false },
+                    },
+                },
                 ArtistProfileRecord: {
                     type: 'object',
                     properties: {
@@ -93,8 +104,12 @@ const options: swaggerJsdoc.Options = {
                         biography: { type: 'string' },
                         photo: { type: 'string' },
                         city: { type: 'string' },
+                        genre: { type: 'string', example: 'Pop' },
+                        minPrice: { type: 'number', example: 500 },
+                        technicalRiderUrl: { type: 'string' },
                         blockedDates: { type: 'array', items: { type: 'string' } },
                         featuredSong: { type: 'object' },
+                        media: { type: 'array', items: { $ref: '#/components/schemas/ArtistProfileMediaItem' } },
                     },
                 },
                 ArtistProfileMediaItem: {
@@ -104,6 +119,7 @@ const options: swaggerJsdoc.Options = {
                         url: { type: 'string', example: 'https://storage...' },
                         type: { type: 'string', enum: ['image', 'audio', 'video'], example: 'image' },
                         name: { type: 'string', example: 'concert_photo.jpg' },
+                        category: { type: 'string', example: 'Backstage' },
                     },
                 },
                 ArtistAvailability: {
@@ -117,31 +133,67 @@ const options: swaggerJsdoc.Options = {
                 DashboardStats: {
                     type: 'object',
                     properties: {
-                        totalEvents: { type: 'number' },
-                        eventsGrowthPercent: { type: 'number' },
-                        totalBalance: { type: 'number' },
-                        profileVisitsTotal: { type: 'number' },
-                        visitsChartData: { type: 'array', items: { type: 'object' } },
+                        totalEvents: { type: 'number', example: 12 },
+                        eventsGrowthPercent: { type: 'number', example: 15.5 },
+                        totalBalance: { type: 'number', example: 450000 },
+                        profileVisitsTotal: { type: 'number', example: 1240 },
+                        visitsChartData: { 
+                            type: 'array', 
+                            items: { 
+                                type: 'object',
+                                properties: {
+                                    day: { type: 'string', example: '2026-03-31' },
+                                    count: { type: 'number', example: 45 }
+                                }
+                            } 
+                        },
+                        nextEvent: { $ref: '#/components/schemas/ContractRecord' }
                     },
                 },
                 ContractRecord: {
                     type: 'object',
                     properties: {
                         id: { type: 'string' },
-                        status: { type: 'string' },
-                        eventDetails: { type: 'object' },
+                        status: { type: 'string', enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED', 'CANCELLED'] },
+                        eventDetails: {
+                            type: 'object',
+                            properties: {
+                                name: { type: 'string' },
+                                date: { type: 'object', description: 'Firestore Timestamp' },
+                                location: { type: 'string' },
+                                description: { type: 'string' }
+                            }
+                        },
+                        financials: {
+                            type: 'object',
+                            properties: {
+                                totalAmount: { type: 'number' },
+                                paidAmount: { type: 'number' },
+                                paymentStatus: { type: 'string', enum: ['UNPAID', 'PARTIAL', 'PAID'] }
+                            }
+                        },
+                        contractUrl: { type: 'string' },
+                        riderUrl: { type: 'string' }
                     },
                 },
-                CreateOrUpdateArtistProfileBody: {
+                CreateContractBody: {
                     type: 'object',
+                    required: ['artistId', 'serviceId', 'eventDetails', 'totalAmount'],
                     properties: {
-                        biography: { type: 'string' },
-                        city: { type: 'string' },
-                        photo: { type: 'string', format: 'binary' },
-                        rider: { type: 'string', format: 'binary', description: 'Technical rider in PDF' },
-                        blockedDates: { type: 'array', items: { type: 'string' } },
-                        featuredSong: { type: 'object' },
-                    },
+                        artistId: { type: 'string' },
+                        serviceId: { type: 'string' },
+                        totalAmount: { type: 'number' },
+                        eventDetails: {
+                            type: 'object',
+                            required: ['name', 'date', 'location'],
+                            properties: {
+                                name: { type: 'string', example: 'Fiesta de Cumpleaños' },
+                                date: { type: 'string', format: 'date-time', example: '2026-12-31T20:00:00Z' },
+                                location: { type: 'string', example: 'Buenos Aires, AR' },
+                                description: { type: 'string', example: 'Evento privado' }
+                            }
+                        }
+                    }
                 },
             },
         },

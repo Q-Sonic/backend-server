@@ -29,8 +29,14 @@ router.use(authMiddleware);
  * /artist-profiles/me:
  *   get:
  *     tags: [Artist Profile]
- *     summary: Obtener mi perfil de artista
+ *     summary: Obtener mi perfil de artista (Solo artistas)
  *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Mi perfil de artista
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ArtistProfileRecord' }
  */
 router.get('/me', roleGuard(UserRoleEnum.ARTISTA), getMyProfile);
 
@@ -63,6 +69,14 @@ router.get('/me', roleGuard(UserRoleEnum.ARTISTA), getMyProfile);
  *         in: query
  *         schema: { type: string, enum: [true, false] }
  *         description: Mostrar solo artistas disponibles hoy
+ *     responses:
+ *       200:
+ *         description: Lista de perfiles de artistas filtrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items: { $ref: '#/components/schemas/ArtistProfileRecord' }
  */
 router.get('/', listArtistProfiles);
 
@@ -72,6 +86,17 @@ router.get('/', listArtistProfiles);
  *   get:
  *     tags: [Artist Profile]
  *     summary: Obtener perfil por ID
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Perfil detallado del artista
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ArtistProfileRecord' }
  */
 router.get('/:id', getArtistProfileById);
 
@@ -81,6 +106,14 @@ router.get('/:id', getArtistProfileById);
  *   get:
  *     tags: [Artist Profile]
  *     summary: Obtener disponibilidad del artista
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Estados de fechas (blocked, reserved, pending)
  */
 router.get('/:id/availability', getArtistAvailability);
 
@@ -89,7 +122,7 @@ router.get('/:id/availability', getArtistAvailability);
  * /artist-profiles:
  *   put:
  *     tags: [Artist Profile]
- *     summary: Crear o actualizar mi perfil (incluye categoría en media)
+ *     summary: Crear o actualizar mi perfil (Form-Data)
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       content:
@@ -98,17 +131,16 @@ router.get('/:id/availability', getArtistAvailability);
  *             type: object
  *             properties:
  *               biography: { type: string }
+ *               genre: { type: string }
  *               city: { type: string }
  *               photo: { type: string, format: binary }
  *               rider: { type: string, format: binary }
- *               media:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     url: { type: string }
- *                     type: { type: string, enum: [image, audio, video] }
- *                     category: { type: string, example: 'Backstage' }
+ *               socialNetworks: { type: string, description: 'JSON stringified social networks object' }
+ *               media: { type: string, description: 'JSON stringified media items array' }
+ *               songs: { type: string, description: 'JSON stringified songs array' }
+ *     responses:
+ *       200:
+ *         description: Perfil guardado exitosamente
  */
 router.put(
     '/',
@@ -123,7 +155,8 @@ router.put(
  * /artist-profiles/media:
  *   post:
  *     tags: [Artist Profile]
- *     summary: Añadir archivos a la galería
+ *     summary: Añadir archivos a la galería (Solo artistas)
+ *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       content:
  *         multipart/form-data:
@@ -133,6 +166,9 @@ router.put(
  *               media:
  *                 type: array
  *                 items: { type: string, format: binary }
+ *     responses:
+ *       200:
+ *         description: Archivos subidos y añadidos a la galería
  */
 router.post(
     '/media',
@@ -147,6 +183,19 @@ router.post(
  *   delete:
  *     tags: [Artist Profile]
  *     summary: Eliminar archivo de la galería
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [url]
+ *             properties:
+ *               url: { type: string, example: 'https://storage.../gallery_123.jpg' }
+ *     responses:
+ *       200:
+ *         description: Archivo eliminado de la galería y del storage
  */
 router.delete(
     '/media',

@@ -1,5 +1,19 @@
 import { Router } from 'express';
-import { register, getMe, login, googleLogin, verifyEmail, forgotPassword, verifyResetCode, resetPassword } from './auth.controller';
+import {
+    register,
+    getMe,
+    login,
+    googleLogin,
+    verifyEmail,
+    forgotPassword,
+    verifyResetCode,
+    resetPassword,
+    changePassword,
+    changeEmail,
+    requestAccountChangeCode,
+    verifyAccountChangeCode,
+    getAccountChangeStatus,
+} from './auth.controller';
 import { authMiddleware } from '../../middleware/auth.middleware';
 
 const router = Router();
@@ -162,5 +176,12 @@ router.post('/reset-password', resetPassword);
  *         description: Datos de sesión
  */
 router.get('/me', authMiddleware, getMe);
+
+router.post('/change-password', authMiddleware, changePassword);
+router.post('/change-email', authMiddleware, changeEmail);
+
+router.post('/account-change/request-code', authMiddleware, requestAccountChangeCode);
+router.post('/account-change/verify-code', authMiddleware, verifyAccountChangeCode);
+router.get('/account-change/status', authMiddleware, getAccountChangeStatus);
 
 export default router;

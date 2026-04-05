@@ -22,6 +22,8 @@ import { apiLimiter, authLimiter } from './middleware/rate-limit.middleware';
 const app = express();
 const { CORS_ORIGIN } = getEnv();
 
+app.set('trust proxy', 1);
+
 // ─── Logging & Security ──────────────────────────────────────────────────────
 app.use(requestLoggerMiddleware);
 app.use(helmet());

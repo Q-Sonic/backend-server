@@ -109,7 +109,6 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
         sendSuccess(res, {
             email: result.email,
             expiresAt: result.expiresAt.toDate(),
-            code: result.code,
             message: 'Si el correo existe, se enviará un código de verificación'
         }, 'Reset code generated');
     } catch (err) {

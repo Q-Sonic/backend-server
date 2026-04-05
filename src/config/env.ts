@@ -6,6 +6,7 @@ interface EnvConfig {
     FIREBASE_SERVICE_ACCOUNT_BASE64: string;
     FIREBASE_STORAGE_BUCKET: string;
     FIREBASE_WEB_API_KEY: string;
+    CORS_ORIGIN: string;
 }
 
 export function getEnv(): EnvConfig {
@@ -15,6 +16,7 @@ export function getEnv(): EnvConfig {
         FIREBASE_SERVICE_ACCOUNT_BASE64,
         FIREBASE_STORAGE_BUCKET,
         FIREBASE_WEB_API_KEY,
+        CORS_ORIGIN,
     } = process.env;
 
     return {
@@ -23,5 +25,6 @@ export function getEnv(): EnvConfig {
         FIREBASE_SERVICE_ACCOUNT_BASE64: FIREBASE_SERVICE_ACCOUNT_BASE64 || '',
         FIREBASE_STORAGE_BUCKET: FIREBASE_STORAGE_BUCKET || '',
         FIREBASE_WEB_API_KEY: FIREBASE_WEB_API_KEY || '',
+        CORS_ORIGIN: CORS_ORIGIN || '*',
     };
 }

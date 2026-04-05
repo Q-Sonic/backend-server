@@ -16,13 +16,15 @@ import { errorMiddleware } from './middleware/error.middleware';
 import { sendSuccess } from './utils/response.util';
 import { setupSwagger } from './config/swagger';
 import { requestLoggerMiddleware } from './middleware/request-logger.middleware';
+import { getEnv } from './config/env';
 
 const app = express();
+const { CORS_ORIGIN } = getEnv();
 
 // ─── Logging & Security ──────────────────────────────────────────────────────
 app.use(requestLoggerMiddleware);
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

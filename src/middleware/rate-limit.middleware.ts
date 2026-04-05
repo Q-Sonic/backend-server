@@ -1,4 +1,5 @@
-import { rateLimit } from 'express-rate-limit';
+import { Request, Response, NextFunction } from 'express';
+import { rateLimit, Options } from 'express-rate-limit';
 import { sendError } from '../utils/response.util';
 
 /**
@@ -9,10 +10,10 @@ export const apiLimiter = rateLimit({
     max: 100, // Limit each IP to 100 requests per windowMs
     standardHeaders: 'draft-7', // combined `RateLimit` header
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    handler: (req, res, _next, options) => {
+    handler: (req: Request, res: Response, _next: NextFunction, options: Options) => {
         sendError({
             res,
-            error: options.message || 'Demasiadas peticiones, intente de nuevo más tarde.',
+            error: (options.message as string) || 'Demasiadas peticiones, intente de nuevo más tarde.',
             statusCode: 429
         });
     }
@@ -27,10 +28,10 @@ export const authLimiter = rateLimit({
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     message: 'Demasiados intentos de autenticación. Intente de nuevo en una hora.',
-    handler: (req, res, _next, options) => {
+    handler: (req: Request, res: Response, _next: NextFunction, options: Options) => {
         sendError({
             res,
-            error: options.message,
+            error: options.message as string,
             statusCode: 429
         });
     }

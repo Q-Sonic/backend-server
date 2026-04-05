@@ -137,39 +137,54 @@ export class ContractsService {
     }
 
     async addPayment(id: string, userId: string, input: AddPaymentInput): Promise<ContractRecord> {
-        const ref = this.db.collection(COLLECTION).doc(id);
-        const doc = await ref.get();
-        if (!doc.exists) throw new Error('Contract not found');
-        const data = doc.data() as ContractRecord;
-
-        if (data.artistId !== userId) throw new Error('Unauthorized to register payment');
+        const amount = Number(input.amount);
+        if (isNaN(amount) || amount <= 0) {
+            throw new Error('El monto del pago debe ser un número positivo');
+        }
 
         const now = admin.firestore.Timestamp.now();
         const newPayment: PaymentItem = {
-            amount: Number(input.amount),
+            amount,
             date: now,
             reference: input.reference || '',
             method: input.method || 'cash',
         };
 
-        const updatedPaidAmount = Number(data.financials.paidAmount) + newPayment.amount;
-        let newPaymentStatus = PaymentStatus.PARTIAL;
+        const result = await this.db.runTransaction(async (transaction) => {
+            const ref = this.db.collection(COLLECTION).doc(id);
+            const doc = await transaction.get(ref);
+            
+            if (!doc.exists) throw new Error('Contrato no encontrado');
+            
+            const data = doc.data() as ContractRecord;
+            if (data.artistId !== userId) {
+                throw new Error('No autorizado para registrar pagos en este contrato');
+            }
 
-        if (updatedPaidAmount >= data.financials.totalAmount) {
-            newPaymentStatus = PaymentStatus.PAID;
-        } else if (updatedPaidAmount <= 0) {
-            newPaymentStatus = PaymentStatus.UNPAID;
-        }
+            const currentPaid = Number(data.financials.paidAmount) || 0;
+            const totalToPay = Number(data.financials.totalAmount) || 0;
+            const updatedPaidAmount = currentPaid + amount;
+            
+            let newPaymentStatus = PaymentStatus.PARTIAL;
+            if (updatedPaidAmount >= totalToPay) {
+                newPaymentStatus = PaymentStatus.PAID;
+            } else if (updatedPaidAmount <= 0) {
+                newPaymentStatus = PaymentStatus.UNPAID;
+            }
 
-        await ref.update({
-            payments: admin.firestore.FieldValue.arrayUnion(newPayment),
-            'financials.paidAmount': updatedPaidAmount,
-            'financials.paymentStatus': newPaymentStatus,
-            updatedAt: now,
+            const updateData = {
+                payments: admin.firestore.FieldValue.arrayUnion(newPayment),
+                'financials.paidAmount': updatedPaidAmount,
+                'financials.paymentStatus': newPaymentStatus,
+                updatedAt: now,
+            };
+
+            transaction.update(ref, updateData);
+            
+            Logger.success(`Payment added atomically to contract ${id}: $${amount} (Total paid: $${updatedPaidAmount})`);
+            return { id: doc.id, ...data, ...updateData, financials: { ...data.financials, paidAmount: updatedPaidAmount, paymentStatus: newPaymentStatus } };
         });
-        Logger.success(`Payment added to contract ${id}: $${newPayment.amount} (Total paid: $${updatedPaidAmount})`);
 
-        const updated = await ref.get();
-        return { id: updated.id, ...updated.data() } as ContractRecord;
+        return result as ContractRecord;
     }
 }

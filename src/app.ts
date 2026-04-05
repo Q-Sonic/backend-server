@@ -17,6 +17,7 @@ import { sendSuccess } from './utils/response.util';
 import { setupSwagger } from './config/swagger';
 import { requestLoggerMiddleware } from './middleware/request-logger.middleware';
 import { getEnv } from './config/env';
+import { apiLimiter, authLimiter } from './middleware/rate-limit.middleware';
 
 const app = express();
 const { CORS_ORIGIN } = getEnv();
@@ -25,6 +26,7 @@ const { CORS_ORIGIN } = getEnv();
 app.use(requestLoggerMiddleware);
 app.use(helmet());
 app.use(cors({ origin: CORS_ORIGIN }));
+app.use('/api', apiLimiter); // Application-wide limit
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -43,7 +45,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes); // Stricter limit for auth
 app.use('/api/users', usersRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/artist-services', artistServicesRoutes);

@@ -18,12 +18,16 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY package*.json ./
+# Set ownership to node user
+COPY --chown=node:node package*.json ./
 # Clean install for production and clean cache
 RUN npm ci --omit=dev && \
     npm cache clean --force
 
-COPY --from=builder /app/dist ./dist
+COPY --from=builder --chown=node:node /app/dist ./dist
+
+# Switch to non-root user
+USER node
 
 EXPOSE 3000
 

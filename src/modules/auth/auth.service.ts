@@ -3,8 +3,17 @@ import { UserRecord, UserRole, LoginResponse, RegisterResponse, GoogleLoginRespo
 import { getEnv } from '../../config/env';
 import { UserRoleEnum } from '../../enum/roles.enum';
 import { VERIFICATION_CODE_EXPIRY_HOURS, VERIFICATION_CODE_LENGTH } from '../../config/verification.config';
+import {
+  ACCOUNT_CHANGE_CODE_LENGTH,
+  ACCOUNT_CHANGE_CODE_TTL_MINUTES,
+  ACCOUNT_CHANGE_SESSION_TTL_MINUTES,
+  ACCOUNT_CHANGE_RESEND_COOLDOWN_SECONDS,
+} from '../../config/account-change.config';
+import { sendAccountChangeVerificationCode, isSmtpConfigured } from '../mail/mail.service';
 import * as crypto from 'crypto';
 import { Logger } from '../../utils/logger.util';
+
+const ACCOUNT_CHANGE_CHALLENGES = 'accountChangeChallenges';
 
 interface RegisterInput {
   email: string;
@@ -121,11 +130,217 @@ export class AuthService {
     return doc.data() as UserRecord;
   }
 
+  private hasEmailPasswordProvider(authUser: admin.auth.UserRecord): boolean {
+    return authUser.providerData.some((p) => p.providerId === 'password');
+  }
+
+  private hashAccountChangeCode(uid: string, code: string): string {
+    const secret = getEnv().ACCOUNT_CHANGE_CODE_SECRET?.trim();
+    console.log(secret);
+    if (!secret || secret.length < 16) {
+      throw new Error('ACCOUNT_CHANGE_CODE_SECRET en .env debe tener al menos 16 caracteres.');
+    }
+    return crypto.createHmac('sha256', secret).update(`${uid}:${code.trim()}`).digest('hex');
+  }
+
+  private challengesRef(uid: string) {
+    return this.db.collection(ACCOUNT_CHANGE_CHALLENGES).doc(uid);
+  }
+
+  async requestAccountChangeCode(uid: string): Promise<void> {
+    if (!isSmtpConfigured()) {
+      throw new Error('El envío de correo no está configurado (SMTP_USER / SMTP_PASS en el servidor).');
+    }
+    const user = await this.getUserById(uid);
+    // const to = user.email?.trim();
+    const to = "gownerbeats@gmail.com";
+    if (!to) {
+      throw new Error('No hay correo en la cuenta para enviar el código.');
+    }
+
+    const ref = this.challengesRef(uid);
+    const snap = await ref.get();
+    const nowMs = Date.now();
+    if (snap.exists) {
+      const lastSent = snap.data()?.lastSentAt as admin.firestore.Timestamp | undefined;
+      if (lastSent && nowMs - lastSent.toMillis() < ACCOUNT_CHANGE_RESEND_COOLDOWN_SECONDS * 1000) {
+        throw new Error(
+          `Espera ${ACCOUNT_CHANGE_RESEND_COOLDOWN_SECONDS} segundos antes de pedir otro código.`
+        );
+      }
+    }
+
+    const code = crypto
+      .randomInt(0, Math.pow(10, ACCOUNT_CHANGE_CODE_LENGTH))
+      .toString()
+      .padStart(ACCOUNT_CHANGE_CODE_LENGTH, '0');
+    const codeHash = this.hashAccountChangeCode(uid, code);
+    const codeExpiresAt = admin.firestore.Timestamp.fromMillis(
+      nowMs + ACCOUNT_CHANGE_CODE_TTL_MINUTES * 60 * 1000
+    );
+
+    await ref.set(
+      {
+        codeHash,
+        codeExpiresAt,
+        lastSentAt: admin.firestore.Timestamp.now(),
+        sessionValidUntil: admin.firestore.FieldValue.delete(),
+      },
+      { merge: true }
+    );
+
+    await sendAccountChangeVerificationCode(
+      to,
+      code,
+      user.displayName?.trim() || ''
+    );
+  }
+
+  async verifyAccountChangeCode(uid: string, code: string): Promise<void> {
+    const ref = this.challengesRef(uid);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      throw new Error('No hay código pendiente. Solicita uno nuevo.');
+    }
+    const d = snap.data() as {
+      codeHash?: string;
+      codeExpiresAt?: admin.firestore.Timestamp;
+    };
+    if (!d.codeHash || !d.codeExpiresAt) {
+      throw new Error('No hay código pendiente o ya fue verificado.');
+    }
+    if (d.codeExpiresAt.toMillis() < Date.now()) {
+      await ref.delete().catch(() => undefined);
+      throw new Error('El código expiró. Solicita uno nuevo.');
+    }
+    if (d.codeHash !== this.hashAccountChangeCode(uid, code)) {
+      throw new Error('Código incorrecto.');
+    }
+
+    const sessionValidUntil = admin.firestore.Timestamp.fromMillis(
+      Date.now() + ACCOUNT_CHANGE_SESSION_TTL_MINUTES * 60 * 1000
+    );
+    await ref.update({
+      codeHash: admin.firestore.FieldValue.delete(),
+      codeExpiresAt: admin.firestore.FieldValue.delete(),
+      sessionValidUntil,
+    });
+  }
+
+  async getAccountChangeStatus(uid: string): Promise<{
+    verified: boolean;
+    pendingCode: boolean;
+    validUntil: string | null;
+  }> {
+    const ref = this.challengesRef(uid);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      return { verified: false, pendingCode: false, validUntil: null };
+    }
+    const d = snap.data() as {
+      codeHash?: string;
+      codeExpiresAt?: admin.firestore.Timestamp;
+      sessionValidUntil?: admin.firestore.Timestamp;
+    };
+
+    if (d.sessionValidUntil && d.sessionValidUntil.toMillis() > Date.now()) {
+      return {
+        verified: true,
+        pendingCode: !!d.codeHash,
+        validUntil: d.sessionValidUntil.toDate().toISOString(),
+      };
+    }
+
+    if (d.codeHash && d.codeExpiresAt) {
+      if (d.codeExpiresAt.toMillis() < Date.now()) {
+        await ref.delete().catch(() => undefined);
+        return { verified: false, pendingCode: false, validUntil: null };
+      }
+      return { verified: false, pendingCode: true, validUntil: null };
+    }
+
+    if (d.sessionValidUntil) {
+      await ref.delete().catch(() => undefined);
+    }
+    return { verified: false, pendingCode: false, validUntil: null };
+  }
+
+  private async assertAccountChangeVerified(uid: string): Promise<void> {
+    const ref = this.challengesRef(uid);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      throw new Error('Primero verifica el código enviado a tu correo.');
+    }
+    const su = (snap.data() as { sessionValidUntil?: admin.firestore.Timestamp })?.sessionValidUntil;
+    if (!su || su.toMillis() <= Date.now()) {
+      throw new Error('La verificación expiró. Solicita un nuevo código e inténtalo de nuevo.');
+    }
+  }
+
+  private async clearAccountChangeChallenge(uid: string): Promise<void> {
+    await this.challengesRef(uid).delete().catch(() => undefined);
+  }
+
+  /**
+   * Cambia la contraseña tras verificación por correo. Exige proveedor email/contraseña.
+   */
+  async changePasswordWithSession(uid: string, newPassword: string): Promise<void> {
+    if (!newPassword || newPassword.length < 8) {
+      throw new Error('La nueva contraseña debe tener al menos 8 caracteres.');
+    }
+    const authUser = await this.auth.getUser(uid);
+    if (!this.hasEmailPasswordProvider(authUser)) {
+      throw new Error(
+        'Esta cuenta usa inicio de sesión con Google. Cambia la contraseña desde tu cuenta de Google o contacta soporte.'
+      );
+    }
+    await this.assertAccountChangeVerified(uid);
+    await this.auth.updateUser(uid, { password: newPassword });
+    await this.auth.revokeRefreshTokens(uid);
+    await this.clearAccountChangeChallenge(uid);
+    Logger.success(`Password updated for uid ${uid} (refresh tokens revoked)`);
+  }
+
+  async changeEmail(uid: string, newEmail: string): Promise<void> {
+    const normalized = newEmail.trim().toLowerCase();
+    if (!this.validateEmail(normalized)) {
+      throw new Error('Formato de correo inválido.');
+    }
+    await this.assertAccountChangeVerified(uid);
+
+    try {
+      await this.auth.updateUser(uid, { email: normalized });
+    } catch (e: unknown) {
+      const code =
+        e && typeof e === 'object' && 'code' in e ? String((e as { code?: string }).code) : '';
+      if (code === 'auth/email-already-exists') {
+        throw new Error('Ese correo ya está en uso por otra cuenta.');
+      }
+      throw e instanceof Error ? e : new Error('No se pudo actualizar el correo.');
+    }
+
+    await this.db.collection('users').doc(uid).update({
+      email: normalized,
+      updatedAt: admin.firestore.Timestamp.now(),
+    });
+    await this.clearAccountChangeChallenge(uid);
+    Logger.success(`Email updated for uid ${uid}`);
+  }
+
   /**
    * Login/Registro con Google OAuth.
+   * Proceso lógico:
+   * 1. Se valida el token que el cliente obtuvo del SDK de Google.
+   * 2. Si el token es válido, extraemos uid y email.
+   * 3. Verificamos si el usuario ya existe en Firestore.
+   * 4. Si es nuevo, creamos el registro con rol 'cliente' por defecto.
+   * 5. Si ya existe, actualizamos su información de perfil (foto, nombre).
+   * 6. Generamos un Custom Token de Firebase. Este token es el que el cliente usará
+   *    para autenticarse con el SDK de Firebase (signInWithCustomToken) y recibir
+   *    automáticamente sus Custom Claims (roles).
    */
   async loginWithGoogle(googleIdToken: string): Promise<GoogleLoginResponse> {
-    // 1. Verificar el idToken de Google con Firebase Admin
+    // 1. Verificar el idToken de Google con Firebase Admin (Autenticidad del origen)
     let decoded: admin.auth.DecodedIdToken;
     try {
       decoded = await this.auth.verifyIdToken(googleIdToken);
@@ -146,8 +361,9 @@ export class AuthService {
     let userRecord: UserRecord;
     let isNewUser = false;
 
+    // Lógica de Sincronización: Siempre mantenemos Firestore al día con los datos de Google
     if (userDoc.exists) {
-      // Usuario existente → actualizamos displayName y photo si cambiaron
+      // Usuario existente → actualizamos displayName y photo si cambiaron en su cuenta de Google
       const existing = userDoc.data() as UserRecord;
       const updates: Partial<UserRecord> = { updatedAt: now };
       if (name && name !== existing.displayName) updates.displayName = name;
@@ -156,7 +372,8 @@ export class AuthService {
       await userRef.update(updates);
       userRecord = { ...existing, ...updates };
     } else {
-      // Nuevo usuario → crear registro con rol CLIENTE por defecto
+      // Nuevo usuario → creamos el registro inicial. El rol por defecto es CLIENTE.
+      // Si el usuario quisiera ser ARTISTA, debería pasar por un flujo de upgrade posterior.
       isNewUser = true;
       const role: UserRole = UserRoleEnum.CLIENTE;
 
@@ -166,18 +383,19 @@ export class AuthService {
         displayName: name ?? email.split('@')[0],
         role,
         photoURL: picture ?? undefined,
-        emailVerified: true, // Google accounts are considered verified
+        emailVerified: true, // Las cuentas de Google se consideran verificadas por confianza delegada
         createdAt: now,
         updatedAt: now,
       };
 
       await userRef.set(userRecord);
 
-      // Asignar custom claim de rol en Firebase Auth
+      // Sincronización con Firebase Auth: Inyectamos el ROL en los Custom Claims para seguridad en el front
       await this.auth.setCustomUserClaims(uid, { role });
     }
 
-    // 2. Generar un customToken firmado por el servidor
+    // Generar Custom Token: Este token es EFÍMERO y seguro.
+    // Solo sirve para que el cliente lo use UNA VEZ para recibir su sesión de Firebase.
     const customToken = await this.auth.createCustomToken(uid, {
       role: userRecord.role,
     });

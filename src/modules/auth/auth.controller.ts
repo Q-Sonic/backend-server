@@ -178,3 +178,73 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
         sendError({ res, error: message, statusCode: 400 });
     }
 }
+
+export async function changePassword(req: Request, res: Response): Promise<void> {
+    try {
+        const { uid } = (req as AuthRequest).user!;
+        const { newPassword } = req.body as { newPassword?: string };
+        if (!newPassword) {
+            sendError({ res, error: 'newPassword is required', statusCode: 400 });
+            return;
+        }
+        await authService.changePasswordWithSession(uid, newPassword);
+        sendSuccess(res, null, 'Contraseña actualizada. Debes iniciar sesión de nuevo.');
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'No se pudo cambiar la contraseña';
+        sendError({ res, error: message, statusCode: 400 });
+    }
+}
+
+export async function changeEmail(req: Request, res: Response): Promise<void> {
+    try {
+        const { uid } = (req as AuthRequest).user!;
+        const { newEmail } = req.body as { newEmail?: string };
+        if (!newEmail) {
+            sendError({ res, error: 'newEmail is required', statusCode: 400 });
+            return;
+        }
+        await authService.changeEmail(uid, newEmail);
+        sendSuccess(res, null, 'Correo actualizado correctamente');
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'No se pudo cambiar el correo';
+        sendError({ res, error: message, statusCode: 400 });
+    }
+}
+
+export async function requestAccountChangeCode(req: Request, res: Response): Promise<void> {
+    try {
+        const { uid } = (req as AuthRequest).user!;
+        await authService.requestAccountChangeCode(uid);
+        sendSuccess(res, null, 'Código enviado a tu correo');
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'No se pudo enviar el código';
+        sendError({ res, error: message, statusCode: 400 });
+    }
+}
+
+export async function verifyAccountChangeCode(req: Request, res: Response): Promise<void> {
+    try {
+        const { uid } = (req as AuthRequest).user!;
+        const { code } = req.body as { code?: string };
+        if (!code?.trim()) {
+            sendError({ res, error: 'code is required', statusCode: 400 });
+            return;
+        }
+        await authService.verifyAccountChangeCode(uid, code.trim());
+        sendSuccess(res, null, 'Código verificado. Ya puedes cambiar correo o contraseña.');
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Código inválido';
+        sendError({ res, error: message, statusCode: 400 });
+    }
+}
+
+export async function getAccountChangeStatus(req: Request, res: Response): Promise<void> {
+    try {
+        const { uid } = (req as AuthRequest).user!;
+        const status = await authService.getAccountChangeStatus(uid);
+        sendSuccess(res, status);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error al consultar estado';
+        sendError({ res, error: message, statusCode: 500 });
+    }
+}

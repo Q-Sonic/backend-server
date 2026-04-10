@@ -15,11 +15,19 @@ router.use(roleGuard(UserRoleEnum.ARTISTA));
  * @swagger
  * /dashboard/stats:
  *   get:
- *     summary: Artist dashboard summary (events growth, balance, visits)
+ *     summary: Resumen del dashboard del artista (crecimiento, balance, visitas)
  *     tags: [Dashboard]
+ *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200:
- *         description: Dashboard stats
+ *         description: Estadísticas del dashboard
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { $ref: '#/components/schemas/DashboardStats' }
  */
 router.get('/stats', (req, res) => controller.getSummary(req, res));
 

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import {
     listMyServices,
     getServiceById,
@@ -10,8 +11,13 @@ import {
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { roleGuard } from '../../middleware/role.middleware';
 import { UserRoleEnum } from '../../enum/roles.enum';
+import { MAX_IMAGE_SIZE } from '../../helper/storage';
 
 const router = Router();
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_IMAGE_SIZE },
+});
 
 router.use(authMiddleware);
 
@@ -22,6 +28,9 @@ router.use(authMiddleware);
  *     tags: [Artist Services]
  *     summary: Listar mis servicios (solo artistas)
  *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de servicios
  */
 router.get('/', listMyServices);
 
@@ -36,6 +45,9 @@ router.get('/', listMyServices);
  *         name: artistId
  *         required: true
  *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de servicios del artista
  */
 router.get('/all/:artistId', listAllServicesByArtistId);
 
@@ -45,6 +57,14 @@ router.get('/all/:artistId', listAllServicesByArtistId);
  *   get:
  *     tags: [Artist Services]
  *     summary: Obtener detalle de un servicio
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Detalle del servicio
  */
 router.get('/:id', getServiceById);
 
@@ -68,8 +88,11 @@ router.get('/:id', getServiceById);
  *               description: { type: string, example: 'Presentación completa...' }
  *               duration: { type: string, example: '60-90 min' }
  *               features: { type: array, items: { type: string }, example: ['Equipo de sonido incluido', 'Luces'] }
+ *     responses:
+ *       201:
+ *         description: Servicio creado
  */
-router.post('/', roleGuard(UserRoleEnum.ARTISTA), createService);
+router.post('/', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), createService);
 
 /**
  * @swagger
@@ -78,6 +101,11 @@ router.post('/', roleGuard(UserRoleEnum.ARTISTA), createService);
  *     tags: [Artist Services]
  *     summary: Actualizar un servicio existente
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
  *     requestBody:
  *       content:
  *         application/json:
@@ -89,8 +117,11 @@ router.post('/', roleGuard(UserRoleEnum.ARTISTA), createService);
  *               description: { type: string }
  *               duration: { type: string }
  *               features: { type: array, items: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Servicio actualizado
  */
-router.put('/:id', roleGuard(UserRoleEnum.ARTISTA), updateService);
+router.put('/:id', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), updateService);
 
 /**
  * @swagger
@@ -99,6 +130,14 @@ router.put('/:id', roleGuard(UserRoleEnum.ARTISTA), updateService);
  *     tags: [Artist Services]
  *     summary: Eliminar un servicio
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       204:
+ *         description: Servicio eliminado
  */
 router.delete('/:id', roleGuard(UserRoleEnum.ARTISTA, UserRoleEnum.ADMIN), deleteService);
 

@@ -9,27 +9,97 @@ const router = Router();
 // Todas las rutas de users requieren auth
 router.use(authMiddleware);
 
-// GET /api/users - Solo admin y soporte pueden ver todos los usuarios
+/**
+ * @swagger
+ * /users:
+ *   get:
+ *     summary: Listar todos los usuarios (Admin/Soporte)
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de usuarios
+ */
 router.get('/', roleGuard(UserRoleEnum.ADMIN, UserRoleEnum.SOPORTE), getAllUsers);
 
 /**
  * @swagger
  * /users/artists:
  *   post:
- *     summary: Admin creates a new artist profile
+ *     summary: El Admin crea un nuevo perfil de artista manualmente
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, displayName]
+ *             properties:
+ *               email: { type: string }
+ *               displayName: { type: string }
  */
 router.post('/artists', roleGuard(UserRoleEnum.ADMIN), createArtist);
 
-// GET /api/users/:id
+/**
+ * @swagger
+ * /users/{id}:
+ *   get:
+ *     summary: Obtener datos de un usuario por ID
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Datos del usuario
+ */
 router.get('/:id', getUserById);
 
-// PUT /api/users/:id
+/**
+ * @swagger
+ * /users/{id}:
+ *   put:
+ *     summary: Actualizar datos de un usuario
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               displayName: { type: string }
+ *               email: { type: string }
+ *               role: { type: string, enum: [admin, soporte, artista, cliente, organizacion] }
+ *     responses:
+ *       200:
+ *         description: Usuario actualizado
+ */
 router.put('/:id', updateUser);
 
-// DELETE /api/users/:id
+/**
+ * @swagger
+ * /users/{id}:
+ *   delete:
+ *     summary: Eliminar un usuario
+ *     tags: [Users]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ */
 router.delete('/:id', deleteUser);
 
 export default router;

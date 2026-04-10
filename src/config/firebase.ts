@@ -26,7 +26,7 @@ export function initFirebase(): void {
         });
 
         initialized = true;
-        console.log(`✅ Firebase initialized (project: ${serviceAccount.projectId})`);
+        console.log(`✅ Firebase initialized (project: ${(serviceAccount as any).project_id})`);
     } catch (error) {
         console.error('❌ Failed to initialize Firebase:', error);
         throw error;

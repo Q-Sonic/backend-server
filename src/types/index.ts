@@ -191,6 +191,8 @@ export interface ArtistProfileRecord {
     totalVisits?: number;
     /** Map of date (YYYY-MM-DD) -> count */
     visitsHistory?: Record<string, number>;
+    /** Artist balance for payments/payouts */
+    balance?: number;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }

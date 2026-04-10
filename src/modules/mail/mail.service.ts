@@ -61,6 +61,45 @@ export async function sendAccountChangeVerificationCode(to: string, code: string
     Logger.info(`Account change code email sent to ${to}`);
 }
 
+export async function sendPaymentConfirmationEmail(to: string, data: {
+    userName: string;
+    orderId: string;
+    amount: number;
+    transactionId: string;
+    authorizationCode: string;
+}): Promise<void> {
+    const env = getEnv();
+    const smtpUser = env.SMTP_USER?.trim();
+    const fromAddr = `StageGo <${smtpUser}>`;
+    
+    const tx = getTransporter();
+    const subject = `Confirmación de Pago — Orden #${data.orderId}`;
+    
+    const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
+            <h2 style="color: #333;">¡Pago Confirmado! 🎵</h2>
+            <p>Hola <strong>${escapeHtml(data.userName)}</strong>,</p>
+            <p>Hemos procesado correctamente tu pago para la orden <strong>#${data.orderId}</strong>.</p>
+            <hr />
+            <table style="width: 100%;">
+                <tr><td><strong>Monto:</strong></td><td>$${data.amount.toFixed(2)}</td></tr>
+                <tr><td><strong>ID Transacción:</strong></td><td>${data.transactionId}</td></tr>
+                <tr><td><strong>Código Autorización:</strong></td><td>${data.authorizationCode}</td></tr>
+            </table>
+            <hr />
+            <p>¡Gracias por ser parte de Q-Music!</p>
+        </div>
+    `;
+
+    await tx.sendMail({
+        from: fromAddr,
+        to,
+        subject,
+        html,
+    });
+    Logger.info(`Payment confirmation email sent to ${to} for order ${data.orderId}`);
+}
+
 function escapeHtml(s: string): string {
     return s
         .replace(/&/g, '&amp;')

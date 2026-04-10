@@ -108,7 +108,28 @@ Retorna el perfil del usuario autenticado.
 ## Users
 
 ### `GET /users` 🔒
-Lista todos los usuarios.
+Lista usuarios con soporte para paginación y filtros.
+
+**Query Params (Opcionales)**
+- `skip`: Número de registros a saltar (default: 0).
+- `take`: Cantidad de registros a retornar (default: 20).
+- `filterField`: Campo para búsqueda por texto (ej: `displayName`).
+- `filterValue`: Valor a buscar (prefijo, ej: `Jo`).
+- `tagField`: Campo para búsqueda exacta (ej: `email`).
+- `tagValue`: Valor exacto (ej: `jose@example.com`).
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": {
+    "data": [ { "uid": "...", "email": "..." } ],
+    "total": 150,
+    "skip": 0,
+    "take": 20
+  }
+}
+```
 
 ### `GET /users/:id` 🔒
 Retorna un usuario por su UID.
@@ -162,65 +183,68 @@ Crea un nuevo perfil de artista. **Solo rol admin.**
 Solo usuarios con rol **artista** pueden acceder. Cada artista gestiona sus propios servicios (concierto, acústico, evento privado).
 
 ### `GET /artist-services`
-Lista los servicios del artista autenticado.
+Lista los servicios del artista autenticado con soporte para paginación y filtros.
+
+**Query Params (Opcionales)**
+- `skip`: Número de registros a saltar (default: 0).
+- `take`: Cantidad de registros a retornar (default: 20).
+- `filterField`: Campo para búsqueda por texto.
+- `filterValue`: Valor a buscar (prefijo).
 
 **Response 200**
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id": "docId123",
-      "artistId": "artistUid",
-      "name": "Concierto",
-      "price": 500,
-      "description": "Show en vivo con banda completa",
-      "createdAt": "...",
-      "updatedAt": "..."
-    }
-  ]
+  "data": {
+    "data": [
+      {
+        "id": "docId123",
+        "artistId": "artistUid",
+        "name": "Concierto",
+        "price": 500,
+        "description": "Show en vivo con banda completa",
+        "createdAt": "...",
+        "updatedAt": "..."
+      }
+    ],
+    "total": 10,
+    "skip": 0,
+    "take": 20
+  }
 }
 ```
+
+### `GET /artist-services/artist/:artistId`
+Lista pública de servicios de un artista específico. Soporta los mismos parámetros de paginación.
 
 ### `GET /artist-services/:id`
 Obtiene un servicio por ID (solo si pertenece al artista).
 
 ### `POST /artist-services`
-Crea un nuevo servicio.
+Crea un nuevo servicio. Acepta **multipart/form-data** para la imagen (`imageUrl`).
 
-**Body**
-```json
-{
-  "name": "Concierto",
-  "price": 500,
-  "description": "Show en vivo con banda completa"
-}
-```
-`name` y `price` son obligatorios. `description` es opcional.
+**Body** (form-data)
+- `name`: Nombre del servicio (Requerido)
+- `price`: Precio (Requerido)
+- `description`: Descripción (Opcional)
+- `duration`: Duración (Opcional)
+- `features`: Array JSON de características (Opcional)
+- `file`: Archivo de imagen (Opcional)
 
 **Response 201**
 ```json
 {
   "success": true,
-  "data": { "id": "...", "artistId": "...", "name": "Concierto", "price": 500, "description": "...", "createdAt": "...", "updatedAt": "..." },
+  "data": { ... },
   "message": "Artist service created"
 }
 ```
 
 ### `PUT /artist-services/:id`
-Actualiza un servicio (solo si pertenece al artista). Campos opcionales: `name`, `price`, `description`.
-
-**Body** (todos opcionales)
-```json
-{
-  "name": "Concierto Premium",
-  "price": 600,
-  "description": "Nueva descripción"
-}
-```
+Actualiza un servicio (solo si pertenece al artista).
 
 ### `DELETE /artist-services/:id`
-Elimina un servicio (solo si pertenece al artista).
+Elimina un servicio (solo si pertenece al artista) y limpia su imagen del storage.
 
 ---
 
@@ -376,35 +400,27 @@ Genera una URL firmada temporal.
 ## Contracts (US-8 — Historial de contratos y eventos) 🔒
 
 ### `GET /contracts/my-history`
-Obtiene el historial de contratos y eventos del cliente autenticado. **Solo rol cliente.**
+Obtiene el historial de contratos y eventos del cliente autenticado con paginación.
+
+**Query Params (Opcionales)**
+- `skip`, `take`, `filterField`, `filterValue`.
 
 **Response 200**
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id": "contractId",
-      "clientId": "...",
-      "artistId": "...",
-      "status": "pending",
-      "eventDetails": {
-        "name": "Boda Juan y Ana",
-        "date": "...",
-        "location": "...",
-        "description": "..."
-      },
-      "financials": {
-        "totalAmount": 1000,
-        "paidAmount": 0,
-        "paymentStatus": "unpaid"
-      },
-      "payments": []
-    }
-  ],
+  "data": {
+    "data": [ { "id": "...", "status": "pending", ... } ],
+    "total": 5,
+    "skip": 0,
+    "take": 20
+  },
   "message": "Contracts history retrieved"
 }
 ```
+
+### `GET /contracts/artist-history` 🔒
+Obtiene el historial de contratos recibidos por el artista. **Solo rol artista.** Soporta paginación.
 
 ### `GET /contracts/:id`
 Obtiene el detalle de un contrato. **Solo cliente o artista involucrado.**
@@ -431,6 +447,124 @@ Registra un nuevo pago. **Solo rol artista.**
   "amount": 500,
   "method": "transfer",
   "reference": "REF123"
+}
+```
+
+---
+
+## Events (US-8 — Calendario y detalles) 🔒
+
+Gestión de eventos y fechas reservadas.
+
+### `GET /events/calendar`
+Obtiene los eventos para el rango de fechas especificado.
+
+**Query Params**
+- `start`: Fecha inicio (ISO string o YYYY-MM-DD)
+- `end`: Fecha fin (ISO string o YYYY-MM-DD)
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "contractId",
+      "eventDetails": {
+        "name": "Boda Juan y Ana",
+        "date": "...",
+        "location": "..."
+      }
+    }
+  ]
+}
+```
+
+### `GET /events/:id`
+Obtiene el detalle extendido de un evento, incluyendo información de contacto del cliente y documentos asociados.
+
+---
+
+## Artist Songs (US-11 — Portfolio Musical) 🔒
+
+Gestión de canciones y portfolio del artista.
+
+### `GET /artist-songs/my-songs`
+Lista las canciones del artista autenticado con paginación.
+
+**Query Params (Opcionales)**
+- `skip`, `take`, `filterField`, `filterValue`.
+
+### `GET /artist-songs/artist/:artistId`
+Lista pública de canciones de un artista.
+
+### `POST /artist-songs`
+Sube una nueva canción. Acepta **multipart/form-data**.
+- `title`: Título (Opcional, se usa el nombre del archivo si falta).
+- `isFeatured`: "true" si es la canción destacada.
+- `audio`: Archivo MP3/WAV (Requerido).
+- `cover`: Archivo de imagen (Opcional).
+
+### `PUT /artist-songs/:id`
+Actualiza metadatos o portada de la canción.
+
+### `DELETE /artist-songs/:id`
+Elimina la canción y sus archivos asociados del Storage.
+
+---
+
+## Dashboard 🔒
+
+Endpoints para resúmenes estadísticos.
+
+### `GET /dashboard/stats`
+Resumen del dashboard para el artista autenticado (crecimiento de eventos, balance actual y visitas al perfil). **Solo rol artista.**
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": {
+    "totalEvents": 12,
+    "eventsGrowthPercent": 15,
+    "totalBalance": 1540.50,
+    "profileVisitsTotal": 450,
+    "visitsChartData": [
+      { "day": "Mon", "count": 10 },
+      { "day": "Tue", "count": 15 }
+    ]
+  }
+}
+```
+
+---
+
+## Payments (Nuvei Integration) 🔒
+
+Integración con la pasarela de pagos Nuvei y gestión de saldos.
+
+### `POST /payments/link-to-pay`
+Genera un link de pago seguro a través de Nuvei (Link To Pay).
+
+**Body**
+```json
+{
+  "amount": 100.00,
+  "description": "Pago reserva Concierto",
+  "dev_reference": "contractId_123"
+}
+```
+
+### `POST /payments/webhook`
+**Endpoint Público (Sin 🔒)**. Recibe notificaciones asíncronas de Nuvei sobre el estado de las transacciones. Debe ser configurado en el panel de control de Nuvei.
+
+### `POST /payments/withdraw`
+Solicita un retiro del saldo acumulado por el artista.
+
+**Body**
+```json
+{
+  "amount": 500.00
 }
 ```
 

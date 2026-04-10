@@ -1,65 +1,73 @@
-import { getFirestore, getAuth, admin } from '../../config/firebase';
+import { getAuth, admin } from '../../config/firebase';
 import { UserRecord, UserRole } from '../../types';
 import { UserRoleEnum } from '../../enum/roles.enum';
+import { BaseFirestoreService, PaginatedResult, PaginateOptions } from '../../helper/base.service';
 
-export class UsersService {
-    private db: admin.firestore.Firestore;
-
+export class UsersService extends BaseFirestoreService<UserRecord> {
     constructor() {
-        this.db = getFirestore();
+        super('users');
     }
 
-    async findAll(): Promise<UserRecord[]> {
-        const snapshot = await this.db.collection('users').orderBy('createdAt', 'desc').get();
-        return snapshot.docs.map((doc) => doc.data() as UserRecord);
+    /**
+     * Advanced pagination with search for users
+     */
+    async findPaginated(options: PaginateOptions): Promise<PaginatedResult<UserRecord>> {
+        return this.paginate({
+            ...options,
+            orderBy: options.orderBy || 'createdAt',
+            orderDirection: options.orderDirection || 'desc'
+        });
     }
 
-    async findById(uid: string): Promise<UserRecord> {
-        const doc = await this.db.collection('users').doc(uid).get();
-        if (!doc.exists) throw new Error(`User ${uid} not found`);
-        return doc.data() as UserRecord;
+    /**
+     * Search by tag (specific field match like email)
+     */
+    async searchByTag(field: string, value: string): Promise<UserRecord[]> {
+        return this.findByField(field, value);
     }
 
-    /** Get display names for many uids (for list enrichment). Missing users yield empty string. */
+    /**
+     * Get display names for many uids (for list enrichment).
+     */
     async getDisplayNamesByUids(uids: string[]): Promise<Record<string, string>> {
         const out: Record<string, string> = {};
         if (uids.length === 0) return out;
         const uniq = [...new Set(uids)];
+        
         await Promise.all(
             uniq.map(async (uid) => {
-                const doc = await this.db.collection('users').doc(uid).get();
-                const data = doc.exists ? (doc.data() as UserRecord) : null;
-                out[uid] = data?.displayName?.trim() ?? '';
+                const user = await this.findById(uid);
+                out[uid] = user?.displayName?.trim() ?? '';
             })
         );
         return out;
     }
 
+    /**
+     * Override update to handle Firebase Auth Custom Claims
+     */
     async update(uid: string, data: Partial<Omit<UserRecord, 'uid' | 'createdAt'>>): Promise<UserRecord> {
-        const ref = this.db.collection('users').doc(uid);
-        const doc = await ref.get();
-        if (!doc.exists) throw new Error(`User ${uid} not found`);
-
-        const updated = { ...data, updatedAt: admin.firestore.Timestamp.now() };
-        await ref.update(updated);
+        const updatedUser = await super.update(uid, data);
 
         if (data.role != null) {
             await getAuth().setCustomUserClaims(uid, { role: data.role as UserRole });
         }
 
-        const updatedDoc = await ref.get();
-        return updatedDoc.data() as UserRecord;
+        return updatedUser;
     }
 
+    /**
+     * Override delete to also remove from Firebase Auth
+     */
     async delete(uid: string): Promise<void> {
-        const doc = await this.db.collection('users').doc(uid).get();
-        if (!doc.exists) throw new Error(`User ${uid} not found`);
-
-        await this.db.collection('users').doc(uid).delete();
+        await super.delete(uid);
         // También elimina de Firebase Auth
         await admin.auth().deleteUser(uid);
     }
 
+    /**
+     * Special creation logic for Artists (Admin only)
+     */
     async createArtist(email: string, password: string, displayName: string): Promise<UserRecord> {
         // 1. Crea el usuario en Firebase Auth usando el SDK de Admin
         const firebaseUser = await admin.auth().createUser({
@@ -71,19 +79,13 @@ export class UsersService {
         // 2. Asigna el rol mediante Firebase Custom Claims
         await admin.auth().setCustomUserClaims(firebaseUser.uid, { role: UserRoleEnum.ARTISTA });
 
-        // 3. Guarda el perfil en Firestore
-        const now = admin.firestore.Timestamp.now();
-        const userRecord: UserRecord = {
+        // 3. Guarda el perfil en Firestore using the base create method with the UID
+        return this.create({
             uid: firebaseUser.uid,
             email,
             displayName,
             role: UserRoleEnum.ARTISTA,
             emailVerified: false,
-            createdAt: now,
-            updatedAt: now,
-        };
-
-        await this.db.collection('users').doc(firebaseUser.uid).set(userRecord);
-        return userRecord;
+        });
     }
 }

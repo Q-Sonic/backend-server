@@ -18,7 +18,11 @@ export class DashboardService {
         const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-        // 1. Fetch contracts for growth calculation
+        // 1. Fetch Profile Data (for visits and balance)
+        const profileDoc = await this.db.collection(PROFILES_COLLECTION).doc(artistUid).get();
+        const profileData = profileDoc.exists ? (profileDoc.data() as ArtistProfileRecord) : null;
+
+        // 2. Fetch contracts for growth calculation
         const allContractsSnapshot = await this.db
             .collection(CONTRACTS_COLLECTION)
             .where('artistId', '==', artistUid)
@@ -49,15 +53,10 @@ export class DashboardService {
             eventsGrowthPercent = 100; // From 0 to something is 100%
         }
 
-        // 2. Calculate Total Balance (all paid amounts)
-        const totalBalance = allContracts.reduce((sum, c) => {
-            // Include COMPLETED or any contract with paidAmount
-            return sum + (Number(c.financials?.paidAmount) || 0);
-        }, 0);
+        // 3. Calculate Total Balance (using the profile balance as source of truth)
+        const totalBalance = profileData?.balance || 0;
 
-        // 3. Profile Visits & History
-        const profileDoc = await this.db.collection(PROFILES_COLLECTION).doc(artistUid).get();
-        const profileData = profileDoc.exists ? (profileDoc.data() as ArtistProfileRecord) : null;
+        // 4. Profile Visits & History
 
         const profileVisitsTotal = profileData?.totalVisits || 0;
         const visitsHistory = profileData?.visitsHistory || {};

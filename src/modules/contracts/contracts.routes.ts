@@ -3,6 +3,12 @@ import { ContractsController } from './contracts.controller';
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { roleGuard } from '../../middleware/role.middleware';
 import { UserRoleEnum } from '../../enum/roles.enum';
+import { validateRequest } from '../../middleware/validate.middleware';
+import { 
+    createContractRequestSchema, 
+    updateContractStatusRequestSchema, 
+    addPaymentRequestSchema 
+} from '../../schemas/contract.schema';
 
 const router = Router();
 const controller = new ContractsController();
@@ -84,7 +90,7 @@ router.get('/:id', (req, res) => controller.getById(req, res));
  *       201:
  *         description: Contrato creado
  */
-router.post('/', roleGuard(UserRoleEnum.CLIENTE), (req, res) => controller.create(req, res));
+router.post('/', roleGuard(UserRoleEnum.CLIENTE), validateRequest(createContractRequestSchema), (req, res) => controller.create(req, res));
 
 /**
  * @swagger
@@ -111,7 +117,7 @@ router.post('/', roleGuard(UserRoleEnum.CLIENTE), (req, res) => controller.creat
  *       200:
  *         description: Estado actualizado
  */
-router.patch('/:id/status', (req, res) => controller.updateStatus(req, res));
+router.patch('/:id/status', validateRequest(updateContractStatusRequestSchema), (req, res) => controller.updateStatus(req, res));
 
 /**
  * @swagger
@@ -140,6 +146,6 @@ router.patch('/:id/status', (req, res) => controller.updateStatus(req, res));
  *       200:
  *         description: Pago registrado
  */
-router.post('/:id/payments', (req, res) => controller.addPayment(req, res));
+router.post('/:id/payments', roleGuard(UserRoleEnum.ARTISTA), validateRequest(addPaymentRequestSchema), (req, res) => controller.addPayment(req, res));
 
 export default router;

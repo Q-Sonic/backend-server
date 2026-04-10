@@ -37,16 +37,23 @@ export class AuthService {
   }
 
   async register(input: RegisterInput): Promise<RegisterResponse> {
-    if (!this.validateEmail(input.email)) {
-      throw new Error('Formato de email inválido');
-    }
-
     // 1. Crea el usuario en Firebase Auth
-    const firebaseUser = await this.auth.createUser({
-      email: input.email,
-      password: input.password,
-      displayName: input.displayName,
-    });
+    let firebaseUser;
+    try {
+      firebaseUser = await this.auth.createUser({
+        email: input.email,
+        password: input.password,
+        displayName: input.displayName,
+      });
+    } catch (error: any) {
+      if (error.code === 'auth/email-already-exists') {
+        throw new Error('Ese correo electrónico ya está en uso por otra cuenta.');
+      }
+      if (error.code === 'auth/invalid-password') {
+        throw new Error('La contraseña no es válida. Debe tener al menos 6 caracteres.');
+      }
+      throw error;
+    }
 
     // 2. Asigna el rol mediante Firebase Custom Claims
     await this.auth.setCustomUserClaims(firebaseUser.uid, { role: input.role });

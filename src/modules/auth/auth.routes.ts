@@ -15,6 +15,8 @@ import {
     getAccountChangeStatus,
 } from './auth.controller';
 import { authMiddleware } from '../../middleware/auth.middleware';
+import { validateRequest } from '../../middleware/validate.middleware';
+import { registerRequestSchema, loginRequestSchema } from '../../schemas/auth.schema';
 
 const router = Router();
 
@@ -40,7 +42,7 @@ const router = Router();
  *                 success: { type: boolean }
  *                 data: { $ref: '#/components/schemas/LoginResponse' }
  */
-router.post('/register', register);
+router.post('/register', validateRequest(registerRequestSchema), register);
 
 /**
  * @swagger
@@ -64,7 +66,7 @@ router.post('/register', register);
  *                 success: { type: boolean }
  *                 data: { $ref: '#/components/schemas/LoginResponse' }
  */
-router.post('/login', login);
+router.post('/login', validateRequest(loginRequestSchema), login);
 
 /**
  * @swagger

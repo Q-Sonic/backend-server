@@ -17,8 +17,13 @@ import { errorMiddleware } from './middleware/error.middleware';
 import { sendSuccess } from './utils/response.util';
 import { setupSwagger } from './config/swagger';
 import { requestLoggerMiddleware } from './middleware/request-logger.middleware';
+import { getEnv } from './config/env';
+import { apiLimiter, authLimiter } from './middleware/rate-limit.middleware';
 
 const app = express();
+const { CORS_ORIGIN } = getEnv();
+
+app.set('trust proxy', 1);
 
 /**
  * ─── Logging & Security ───
@@ -29,7 +34,8 @@ const app = express();
  */
 app.use(requestLoggerMiddleware);
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: CORS_ORIGIN }));
+app.use('/api', apiLimiter); // Application-wide limit
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

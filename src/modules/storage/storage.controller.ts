@@ -15,6 +15,20 @@ const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const VIDEO_MIMES = ['video/mp4', 'video/webm', 'video/quicktime'];
 const AUDIO_MIMES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg'];
 
+interface UploadFileBody {
+    folder?: string;
+}
+
+interface DeleteFileBody {
+    url?: string;
+    filePath?: string;
+}
+
+interface GetSignedUrlBody {
+    filePath: string;
+    expiresInMs?: number;
+}
+
 function getMaxSizeForMime(mime: string): number {
     if (IMAGE_MIMES.includes(mime)) return MAX_IMAGE_SIZE;
     if (VIDEO_MIMES.includes(mime)) return MAX_VIDEO_SIZE;
@@ -40,7 +54,7 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
             return;
         }
 
-        const { folder } = req.body as { folder?: string };
+        const { folder } = req.body as UploadFileBody;
         const url = await storageService.uploadFile(
             req.file.buffer,
             req.file.originalname,
@@ -57,7 +71,7 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
 
 export async function deleteFile(req: Request, res: Response): Promise<void> {
     try {
-        const { url, filePath } = req.body as { url?: string; filePath?: string };
+        const { url, filePath } = req.body as DeleteFileBody;
 
         let pathToDelete: string | null = null;
         if (url) {
@@ -89,10 +103,7 @@ export async function deleteFile(req: Request, res: Response): Promise<void> {
 
 export async function getSignedUrl(req: Request, res: Response): Promise<void> {
     try {
-        const { filePath, expiresInMs } = req.body as {
-            filePath: string;
-            expiresInMs?: number;
-        };
+        const { filePath, expiresInMs } = req.body as GetSignedUrlBody;
 
         if (!filePath) {
             sendError({ res, error: 'filePath is required', statusCode: 400 });

@@ -1,18 +1,49 @@
 import { Request, Response } from 'express';
-import { AuthRequest } from '../../types';
+import { AuthRequest, UserRole } from '../../types';
 import { AuthService } from './auth.service';
 import { sendSuccess, sendCreated, sendError } from '../../utils/response.util';
 
 const authService = new AuthService();
 
+interface RegisterBody {
+    email: string;
+    password: string;
+    displayName: string;
+    role: UserRole;
+}
+
+interface LoginBody {
+    email?: string;
+    password?: string;
+}
+
+interface GoogleLoginBody {
+    idToken?: string;
+}
+
+interface VerifyEmailBody {
+    uid?: string;
+    code?: string;
+}
+
+interface ForgotPasswordBody {
+    email?: string;
+}
+
+interface VerifyResetCodeBody {
+    email?: string;
+    code?: string;
+}
+
+interface ResetPasswordBody {
+    email?: string;
+    code?: string;
+    newPassword?: string;
+}
+
 export async function register(req: Request, res: Response): Promise<void> {
     try {
-        const { email, password, displayName, role } = req.body as {
-            email: string;
-            password: string;
-            displayName: string;
-            role: import('../../types').UserRole;
-        };
+        const { email, password, displayName, role } = req.body as RegisterBody;
 
         if (!email || !password || !displayName || !role) {
             sendError({ res, error: 'email, password, displayName and role are required', statusCode: 400 });
@@ -40,10 +71,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
 
 export async function login(req: Request, res: Response): Promise<void> {
     try {
-        const { email, password } = req.body as {
-            email?: string;
-            password?: string;
-        };
+        const { email, password } = req.body as LoginBody;
 
         if (!email || !password) {
             sendError({ res, error: 'email and password are required', statusCode: 400 });
@@ -60,7 +88,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 
 export async function googleLogin(req: Request, res: Response): Promise<void> {
     try {
-        const { idToken } = req.body as { idToken?: string };
+        const { idToken } = req.body as GoogleLoginBody;
 
         if (!idToken) {
             sendError({ res, error: 'idToken is required', statusCode: 400 });
@@ -77,7 +105,7 @@ export async function googleLogin(req: Request, res: Response): Promise<void> {
 
 export async function verifyEmail(req: Request, res: Response): Promise<void> {
     try {
-        const { uid, code } = req.body as { uid?: string; code?: string };
+        const { uid, code } = req.body as VerifyEmailBody;
 
         if (!uid || !code) {
             sendError({ res, error: 'uid and code are required', statusCode: 400 });
@@ -97,7 +125,7 @@ export async function verifyEmail(req: Request, res: Response): Promise<void> {
 
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
     try {
-        const { email } = req.body as { email?: string };
+        const { email } = req.body as ForgotPasswordBody;
 
         if (!email) {
             sendError({ res, error: 'email is required', statusCode: 400 });
@@ -109,7 +137,6 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
         sendSuccess(res, {
             email: result.email,
             expiresAt: result.expiresAt.toDate(),
-            code: result.code,
             message: 'Si el correo existe, se enviará un código de verificación'
         }, 'Reset code generated');
     } catch (err) {
@@ -120,7 +147,7 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 
 export async function verifyResetCode(req: Request, res: Response): Promise<void> {
     try {
-        const { email, code } = req.body as { email?: string; code?: string };
+        const { email, code } = req.body as VerifyResetCodeBody;
 
         if (!email || !code) {
             sendError({ res, error: 'email and code are required', statusCode: 400 });
@@ -137,7 +164,7 @@ export async function verifyResetCode(req: Request, res: Response): Promise<void
 
 export async function resetPassword(req: Request, res: Response): Promise<void> {
     try {
-        const { email, code, newPassword } = req.body as { email?: string; code?: string; newPassword?: string };
+        const { email, code, newPassword } = req.body as ResetPasswordBody;
 
         if (!email || !code || !newPassword) {
             sendError({ res, error: 'email, code and newPassword are required', statusCode: 400 });

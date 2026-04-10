@@ -29,8 +29,14 @@ function getArtistId(req: AuthRequest): string {
 export async function listMySongs(req: AuthRequest, res: Response): Promise<void> {
     try {
         const artistId = getArtistId(req);
-        const songs = await artistSongsService.findAllByArtistId(artistId);
-        sendSuccess(res, songs);
+        const { skip, take, filterField, filterValue } = req.query;
+        const result = await artistSongsService.findAllByArtistId(artistId, {
+            skip: skip ? Number(skip) : 0,
+            take: take ? Number(take) : 20,
+            filterField: filterField ? String(filterField) : undefined,
+            filterValue: filterValue ? String(filterValue) : undefined,
+        });
+        sendSuccess(res, result);
     } catch (err) {
         if (err instanceof Error && err.message === 'Unauthorized') {
             sendForbidden(res, 'Acceso denegado');
@@ -42,8 +48,14 @@ export async function listMySongs(req: AuthRequest, res: Response): Promise<void
 
 export async function listSongsByArtistId(req: AuthRequest, res: Response): Promise<void> {
     try {
-        const songs = await artistSongsService.findAllByArtistId(String(req.params.artistId));
-        sendSuccess(res, songs);
+        const { skip, take, filterField, filterValue } = req.query;
+        const result = await artistSongsService.findAllByArtistId(String(req.params.artistId), {
+            skip: skip ? Number(skip) : 0,
+            take: take ? Number(take) : 20,
+            filterField: filterField ? String(filterField) : undefined,
+            filterValue: filterValue ? String(filterValue) : undefined,
+        });
+        sendSuccess(res, result);
     } catch (err) {
         sendError({ res, error: err instanceof Error ? err.message : 'Failed to list songs', statusCode: 500 });
     }
@@ -87,7 +99,7 @@ export async function createSong(req: AuthRequest, res: Response): Promise<void>
             );
         }
 
-        const created = await artistSongsService.create(artistId, {
+        const created = await artistSongsService.createSong(artistId, {
             title: title || audio.originalname.replace(/\.[^/.]+$/, ''),
             audioUrl,
             coverUrl,
@@ -126,7 +138,7 @@ export async function updateSong(req: AuthRequest, res: Response): Promise<void>
             );
         }
 
-        const updated = await artistSongsService.update(id, artistId, {
+        const updated = await artistSongsService.updateSong(id, artistId, {
             ...(title !== undefined ? { title } : {}),
             ...(coverUrl !== undefined ? { coverUrl } : {}),
             ...(isFeatured !== undefined ? { isFeatured } : {}),
@@ -144,7 +156,7 @@ export async function updateSong(req: AuthRequest, res: Response): Promise<void>
 export async function deleteSong(req: AuthRequest, res: Response): Promise<void> {
     try {
         const artistId = getArtistId(req);
-        await artistSongsService.delete(String(req.params.id), artistId);
+        await artistSongsService.deleteSong(String(req.params.id), artistId);
         sendSuccess(res, null, 'Song deleted');
     } catch (err) {
         if (err instanceof Error && err.message === 'Unauthorized') {

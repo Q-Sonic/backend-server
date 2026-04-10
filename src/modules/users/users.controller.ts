@@ -8,10 +8,21 @@ import {
 
 const usersService = new UsersService();
 
-export async function getAllUsers(_req: Request, res: Response): Promise<void> {
+export async function getAllUsers(req: Request, res: Response): Promise<void> {
     try {
-        const users = await usersService.findAll();
-        sendSuccess(res, users);
+        const { skip, take, filterField, filterValue, tagField, tagValue } = req.query;
+
+        const options = {
+            skip: skip ? Number(skip) : 0,
+            take: take ? Number(take) : 20,
+            filterField: filterField ? String(filterField) : undefined,
+            filterValue: filterValue ? String(filterValue) : undefined,
+            tagField: tagField ? String(tagField) : undefined,
+            tagValue: tagValue !== undefined ? tagValue : undefined,
+        };
+
+        const result = await usersService.findPaginated(options);
+        sendSuccess(res, result);
     } catch (err) {
         sendError({ res, error: err instanceof Error ? err.message : 'Failed to fetch users', statusCode: 500 });
     }

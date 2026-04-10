@@ -25,8 +25,14 @@ function getArtistId(req: AuthRequest): string {
 export async function listMyServices(req: AuthRequest, res: Response): Promise<void> {
     try {
         const artistId = getArtistId(req);
-        const services = await artistServicesService.findAllByArtistId(artistId);
-        sendSuccess(res, services);
+        const { skip, take, filterField, filterValue } = req.query;
+        const result = await artistServicesService.findAllByArtistId(artistId, {
+            skip: skip ? Number(skip) : 0,
+            take: take ? Number(take) : 20,
+            filterField: filterField ? String(filterField) : undefined,
+            filterValue: filterValue ? String(filterValue) : undefined,
+        });
+        sendSuccess(res, result);
     } catch (err) {
         if (err instanceof Error && err.message === 'Unauthorized') {
             sendForbidden(res, 'Acceso denegado');
@@ -42,8 +48,14 @@ export async function listMyServices(req: AuthRequest, res: Response): Promise<v
 
 export async function listAllServicesByArtistId(req: AuthRequest, res: Response): Promise<void> {
     try {
-        const services = await artistServicesService.findAllByArtistId(String(req.params.artistId));
-        sendSuccess(res, services);
+        const { skip, take, filterField, filterValue } = req.query;
+        const result = await artistServicesService.findAllByArtistId(String(req.params.artistId), {
+            skip: skip ? Number(skip) : 0,
+            take: take ? Number(take) : 20,
+            filterField: filterField ? String(filterField) : undefined,
+            filterValue: filterValue ? String(filterValue) : undefined,
+        });
+        sendSuccess(res, result);
     } catch (err) {
         if (err instanceof Error && err.message === 'Unauthorized') {
             sendForbidden(res, 'Acceso denegado');
@@ -60,7 +72,7 @@ export async function listAllServicesByArtistId(req: AuthRequest, res: Response)
 export async function getServiceById(req: AuthRequest, res: Response): Promise<void> {
     try {
         const artistId = getArtistId(req);
-        const service = await artistServicesService.findById(
+        const service = await artistServicesService.findByIdAndArtist(
             String(req.params.id),
             artistId
         );
@@ -107,13 +119,11 @@ export async function createService(req: AuthRequest, res: Response): Promise<vo
             }
         }
         
-        console.log('body', body);
-
         if (!body.name || body.price == null) {
             sendError({ res, error: 'name and price are required', statusCode: 400 });
             return;
         }
-        const created = await artistServicesService.create(artistId, {
+        const created = await artistServicesService.createService(artistId, {
             name: body.name,
             price: body.price,
             description: body.description ?? '',
@@ -152,7 +162,7 @@ export async function updateService(req: AuthRequest, res: Response): Promise<vo
                 sendError({ res, error: 'Image too large. Maximum size is 5 MB', statusCode: 400 });
                 return;
             }
-            const previous = await artistServicesService.findById(serviceId, artistId);
+            const previous = await artistServicesService.findByIdAndArtist(serviceId, artistId);
             imageUrl = await storageService.uploadFile(
                 file.buffer,
                 file.originalname,
@@ -164,9 +174,7 @@ export async function updateService(req: AuthRequest, res: Response): Promise<vo
                 if (oldPath) {
                     try {
                         await storageService.deleteFile(oldPath);
-                    } catch {
-                        // Ignore cleanup errors during replace flow.
-                    }
+                    } catch { /* ignore cleanup errors */ }
                 }
             }
         }
@@ -180,7 +188,7 @@ export async function updateService(req: AuthRequest, res: Response): Promise<vo
             }
         }
 
-        const updated = await artistServicesService.update(
+        const updated = await artistServicesService.updateService(
             serviceId,
             artistId,
             {
@@ -202,7 +210,7 @@ export async function updateService(req: AuthRequest, res: Response): Promise<vo
 export async function deleteService(req: AuthRequest, res: Response): Promise<void> {
     try {
         const artistId = getArtistId(req);
-        await artistServicesService.delete(String(req.params.id), artistId);
+        await artistServicesService.deleteService(String(req.params.id), artistId);
         sendSuccess(res, null, 'Artist service deleted');
     } catch (err) {
         if (err instanceof Error && err.message === 'Unauthorized') {

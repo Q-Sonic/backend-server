@@ -182,9 +182,21 @@ export class ContractsService {
             transaction.update(ref, updateData);
             
             Logger.success(`Payment added atomically to contract ${id}: $${amount} (Total paid: $${updatedPaidAmount})`);
-            return { id: doc.id, ...data, ...updateData, financials: { ...data.financials, paidAmount: updatedPaidAmount, paymentStatus: newPaymentStatus } };
+
+            // Retornamos el registro actualizado manualmente para evitar una lectura extra
+            return { 
+                ...data,
+                id: doc.id, 
+                payments: [...(data.payments || []), newPayment],
+                financials: { 
+                    ...data.financials, 
+                    paidAmount: updatedPaidAmount, 
+                    paymentStatus: newPaymentStatus 
+                },
+                updatedAt: now
+            } as ContractRecord;
         });
 
-        return result as ContractRecord;
+        return result;
     }
 }

@@ -49,6 +49,7 @@ interface EnvConfig {
     SMTP_PASS: string;
     /** Remitente; por defecto SMTP_USER. Ej: "Q-Sonic <noreply@gmail.com>" */
     MAIL_FROM: string;
+    CORS_ORIGIN: string;
 }
 
 export function getEnv(): EnvConfig {
@@ -65,6 +66,7 @@ export function getEnv(): EnvConfig {
         SMTP_USER,
         SMTP_PASS,
         MAIL_FROM,
+        CORS_ORIGIN,
     } = process.env;
 
     return {
@@ -80,5 +82,6 @@ export function getEnv(): EnvConfig {
         SMTP_USER: cleanEnvValue(SMTP_USER),
         SMTP_PASS: cleanEnvValue(SMTP_PASS, { stripSpaces: true }),
         MAIL_FROM: cleanEnvValue(MAIL_FROM),
+        CORS_ORIGIN: cleanEnvValue(CORS_ORIGIN) || '*',
     };
 }

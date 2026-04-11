@@ -46,7 +46,7 @@ app.use(express.urlencoded({ extended: true }));
  * Útil para monitoreo y para que Docker sepa si el contenedor está saludable.
  */
 app.get('/api/health', (_req, res) => {
-    sendSuccess(res, { uptime: process.uptime() }, 'Q-Music API is running 🎵');
+    sendSuccess(res, { uptime: process.uptime(), version: '1.1.6' }, 'Q-Music API is running 🎵');
 });
 
 /**

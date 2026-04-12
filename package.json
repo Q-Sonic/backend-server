@@ -22,6 +22,7 @@
   "author": "Q-Music",
   "license": "MIT",
   "dependencies": {
+    "axios": "^1.15.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^4.22.1",
@@ -30,7 +31,7 @@
     "firebase-admin": "^13.7.0",
     "helmet": "^8.1.0",
     "multer": "^2.1.1",
-    "nodemailer": "^8.0.4",
+    "nodemailer": "^8.0.5",
     "pdfkit": "^0.18.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",

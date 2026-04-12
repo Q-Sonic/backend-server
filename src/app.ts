@@ -13,6 +13,7 @@ import contractsRoutes from './modules/contracts/contracts.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import eventsRoutes from './modules/events/events.routes';
 import artistSongsRoutes from './modules/artist-songs/artist-songs.routes';
+import paymentsRoutes from './modules/payments/payments.routes';
 import { errorMiddleware } from './middleware/error.middleware';
 import { sendSuccess } from './utils/response.util';
 import { setupSwagger } from './config/swagger';
@@ -45,7 +46,7 @@ app.use(express.urlencoded({ extended: true }));
  * Útil para monitoreo y para que Docker sepa si el contenedor está saludable.
  */
 app.get('/api/health', (_req, res) => {
-    sendSuccess(res, { uptime: process.uptime() }, 'Q-Music API is running 🎵');
+    sendSuccess(res, { uptime: process.uptime(), version: '1.1.6' }, 'Q-Music API is running 🎵');
 });
 
 /**
@@ -63,6 +64,7 @@ app.use('/api/contracts', contractsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/artist-songs', artistSongsRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 /**
  * ─── Swagger Docs ───

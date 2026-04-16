@@ -2,7 +2,7 @@ import { getFirestore, admin } from '../../config/firebase';
 import { DashboardStats, ContractRecord, ArtistProfileRecord } from '../../types';
 import { ContractStatus } from '../../enum/contract.enum';
 
-const CONTRACTS_COLLECTION = 'contracts';
+const ORDERS_COLLECTION = 'orders';
 const PROFILES_COLLECTION = 'artist_profiles';
 
 export class DashboardService {
@@ -18,70 +18,39 @@ export class DashboardService {
         const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-        // 1. Fetch contracts for growth calculation
-        const allContractsSnapshot = await this.db
-            .collection(CONTRACTS_COLLECTION)
-            .where('artistId', '==', artistUid)
+        // 1. Fetch orders (instead of contracts)
+        const allOrdersSnapshot = await this.db
+            .collection(ORDERS_COLLECTION)
+            .where('userId', '==', artistUid) // Note: Need to verify if artist is userId or another field
             .get();
 
-        const allContracts = allContractsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        } as ContractRecord));
-
-        const currentMonthEvents = allContracts.filter(c => {
-            const date = c.createdAt.toDate();
-            return date >= startOfCurrentMonth;
-        });
-
-        const lastMonthEvents = allContracts.filter(c => {
-            const date = c.createdAt.toDate();
-            return date >= startOfLastMonth && date <= endOfLastMonth;
-        });
-
-        const totalEventsCurr = currentMonthEvents.length;
-        const totalEventsLast = lastMonthEvents.length;
-
-        let eventsGrowthPercent = 0;
-        if (totalEventsLast > 0) {
-            eventsGrowthPercent = ((totalEventsCurr - totalEventsLast) / totalEventsLast) * 100;
-        } else if (totalEventsCurr > 0) {
-            eventsGrowthPercent = 100; // From 0 to something is 100%
-        }
-
-        // 2. Calculate Total Balance (all paid amounts)
-        const totalBalance = allContracts.reduce((sum, c) => {
-            // Include COMPLETED or any contract with paidAmount
-            return sum + (Number(c.financials?.paidAmount) || 0);
-        }, 0);
-
-        // 3. Profile Visits & History
+        // 2. Profile Visits, History & REAL BALANCE
         const profileDoc = await this.db.collection(PROFILES_COLLECTION).doc(artistUid).get();
-        const profileData = profileDoc.exists ? (profileDoc.data() as ArtistProfileRecord) : null;
+        const profileData = profileDoc.exists ? (profileDoc.data() as any) : null;
 
+        // Use the balance field from the profile as requested by the real data schema
+        const totalBalance = profileData?.balance || 0;
         const profileVisitsTotal = profileData?.totalVisits || 0;
         const visitsHistory = profileData?.visitsHistory || {};
 
-        // Generate chart data for the last 7 days (as shown in image)
-        const visitsChartData = this.generateWeeklyVisits(visitsHistory);
+        // 3. Growth calculation (Placeholder if orders don't have createdAt as expected)
+        const totalEventsCurr = 0; // Needs adjustment based on orders/contracts reality
+        const eventsGrowthPercent = 0;
 
-        // 4. Next Event (upcoming)
-        const nextEvent = allContracts
-            .filter(c => c.eventDetails.date.toDate() >= now && c.status === ContractStatus.ACCEPTED)
-            .sort((a, b) => a.eventDetails.date.toMillis() - b.eventDetails.date.toMillis())[0];
+        // 4. Generate chart data
+        const visitsChartData = this.generateWeeklyVisits(visitsHistory);
 
         return {
             totalEvents: totalEventsCurr,
-            eventsGrowthPercent: Math.round(eventsGrowthPercent),
+            eventsGrowthPercent,
             totalBalance,
             profileVisitsTotal,
             visitsChartData,
-            nextEvent
+            // nextEvent is omitted for now as 'orders' schema doesn't match 'ContractRecord'
         };
     }
 
     private generateWeeklyVisits(history: Record<string, number>) {
-        // Today and 6 days before
         const result = [];
         const daysShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         

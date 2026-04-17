@@ -34,8 +34,19 @@ export class PaymentsService {
 
         const requestBody = {
             user: { id: payload.user_id, email: payload.user_email, name: "Cliente", last_name: "Q-Music" },
-            order: { dev_reference: payload.dev_reference, description: payload.description, amount: payload.amount, currency: "USD" },
-            configuration: { success_url: 'https://q-sonic.vercel.app/payments/success' }
+            order: { 
+                dev_reference: payload.dev_reference, 
+                description: payload.description, 
+                amount: payload.amount, 
+                currency: "USD",
+                installments_type: 0 // Requerido: 0 para que no falle por cuotas
+            },
+            configuration: { 
+                success_url: 'https://q-sonic.vercel.app/payments/success',
+                failure_url: 'https://q-sonic.vercel.app/payments/failure',
+                pending_url: 'https://q-sonic.vercel.app/payments/pending',
+                review_url: 'https://q-sonic.vercel.app/payments/review'
+            }
         };
 
         try {
@@ -45,7 +56,7 @@ export class PaymentsService {
             }
             throw new Error(response.data.error || 'Error Nuvei');
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.message);
+            throw new Error(error.response?.data?.error?.type || error.response?.data?.error || error.message);
         }
     }
 

@@ -14,7 +14,7 @@ export class PaymentsController {
      */
     static async createLinkToPay(req: Request, res: Response) {
         const { amount, description, dev_reference } = req.body;
-        const user = (req as any).user; // From authenticate middleware
+        const user = (req as any).user;
 
         if (!amount || !description || !dev_reference) {
             return sendError({ res, error: 'Faltan parámetros de pago (amount, description, dev_reference)', statusCode: 400 });

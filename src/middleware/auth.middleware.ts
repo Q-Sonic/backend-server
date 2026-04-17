@@ -35,7 +35,8 @@ export async function authMiddleware(
             role: (roleFromDb as UserRole) ?? (tokenRole as UserRole),
         };
         next();
-    } catch {
+    } catch (error: any) {
+        console.error('[AuthMiddleware] Token verification failed:', error.message);
         sendUnauthorized(res, 'Invalid or expired token');
     }
 }

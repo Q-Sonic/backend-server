@@ -92,7 +92,12 @@ export class PaymentsController {
         }
 
         try {
-            const data = await PaymentsService.updateWithdrawalStatus(user.uid, id, status, reason);
+            const data = await PaymentsService.updateWithdrawalStatus(
+                user.uid, 
+                id as string, 
+                status as any, 
+                reason as string
+            );
             return sendSuccess(res, data, `Solicitud de retiro actualizada a ${status}`);
         } catch (error: any) {
             Logger.error('[PaymentsController Admin] Error:', error.message);

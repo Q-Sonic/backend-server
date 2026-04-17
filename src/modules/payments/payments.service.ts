@@ -232,7 +232,7 @@ export class PaymentsService {
             .orderBy('createdAt', 'desc')
             .get();
 
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc: admin.firestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
     }
 
     /**
@@ -245,7 +245,7 @@ export class PaymentsService {
             .orderBy('createdAt', 'desc')
             .get();
 
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc: admin.firestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
     }
 
     /**
@@ -260,6 +260,6 @@ export class PaymentsService {
         }
 
         const snapshot = await query.orderBy('createdAt', 'desc').get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc: admin.firestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data() }));
     }
 }

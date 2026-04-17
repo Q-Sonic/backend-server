@@ -53,4 +53,92 @@ export class PaymentsController {
             return res.status(200).send('Webhook error handled');
         }
     }
+
+    /**
+     * POST /api/payments/withdraw
+     * Process a withdrawal request from an artist.
+     */
+    static async withdraw(req: Request, res: Response) {
+        const { amount, bankDetails } = req.body;
+        const user = (req as any).user;
+
+        if (!amount || !bankDetails) {
+            return sendError({ res, error: 'Faltan parámetros (amount, bankDetails)', statusCode: 400 });
+        }
+
+        try {
+            const data = await PaymentsService.requestWithdraw(user.uid, {
+                amount,
+                bankDetails
+            });
+
+            return sendSuccess(res, data, 'Solicitud de retiro procesada exitosamente');
+        } catch (error: any) {
+            return sendError({ res, error: error.message || 'Error al procesar el retiro', statusCode: 500 });
+        }
+    }
+
+    /**
+     * PUT /api/payments/admin/withdrawals/:id
+     * Update status (COMPLETED/REJECTED) - Admin Only.
+     */
+    static async updateWithdrawalStatus(req: Request, res: Response) {
+        const { id } = req.params;
+        const { status, reason } = req.body;
+        const user = (req as any).user;
+
+        if (!status) {
+            return sendError({ res, error: 'Faltan parámetros (status)', statusCode: 400 });
+        }
+
+        try {
+            const data = await PaymentsService.updateWithdrawalStatus(user.uid, id, status, reason);
+            return sendSuccess(res, data, `Solicitud de retiro actualizada a ${status}`);
+        } catch (error: any) {
+            Logger.error('[PaymentsController Admin] Error:', error.message);
+            return sendError({ res, error: error.message || 'Error al actualizar el retiro', statusCode: 500 });
+        }
+    }
+
+    /**
+     * GET /api/payments/withdrawals
+     * Get withdrawal requests for the authenticated artist.
+     */
+    static async getArtistWithdrawals(req: Request, res: Response) {
+        const user = (req as any).user;
+        try {
+            const data = await PaymentsService.getArtistWithdrawals(user.uid);
+            return sendSuccess(res, data, 'Historial de retiros obtenido');
+        } catch (error: any) {
+            return sendError({ res, error: error.message, statusCode: 500 });
+        }
+    }
+
+    /**
+     * GET /api/payments/transactions
+     * Get wallet transactions for the authenticated artist.
+     */
+    static async getArtistTransactions(req: Request, res: Response) {
+        const user = (req as any).user;
+        try {
+            const data = await PaymentsService.getArtistTransactions(user.uid);
+            return sendSuccess(res, data, 'Historial de transacciones obtenido');
+        } catch (error: any) {
+            return sendError({ res, error: error.message, statusCode: 500 });
+        }
+    }
+
+    /**
+     * GET /api/payments/admin/withdrawals
+     * Get all withdrawal requests (Admin Only).
+     */
+    static async getAllWithdrawals(req: Request, res: Response) {
+        const { status } = req.query;
+        try {
+            const data = await PaymentsService.getAllWithdrawals(status as string);
+            return sendSuccess(res, data, 'Listado de solicitudes obtenido');
+        } catch (error: any) {
+            return sendError({ res, error: error.message, statusCode: 500 });
+        }
+    }
 }

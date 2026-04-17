@@ -50,6 +50,8 @@ interface EnvConfig {
     SMTP_PASS: string;
     /** Remitente; por defecto SMTP_USER. Ej: "Q-Sonic <noreply@gmail.com>" */
     MAIL_FROM: string;
+    /** Email to receive notifications (withdrawals, etc.) */
+    ADMIN_EMAIL?: string;
     NUVEI_LTP_SERVER_KEY: string;
     NUVEI_LTP_SERVER_SECRET: string;
     NUVEI_API_ENDPOINT: string;
@@ -70,6 +72,7 @@ export function getEnv(): EnvConfig {
         SMTP_USER,
         SMTP_PASS,
         MAIL_FROM,
+        ADMIN_EMAIL,
         NUVEI_LTP_SERVER_KEY,
         NUVEI_LTP_SERVER_SECRET,
         NUVEI_API_ENDPOINT,
@@ -89,6 +92,7 @@ export function getEnv(): EnvConfig {
         SMTP_USER: cleanEnvValue(SMTP_USER),
         SMTP_PASS: cleanEnvValue(SMTP_PASS, { stripSpaces: true }),
         MAIL_FROM: cleanEnvValue(MAIL_FROM),
+        ADMIN_EMAIL: cleanEnvValue(ADMIN_EMAIL),
         NUVEI_LTP_SERVER_KEY: cleanEnvValue(NUVEI_LTP_SERVER_KEY),
         NUVEI_LTP_SERVER_SECRET: cleanEnvValue(NUVEI_LTP_SERVER_SECRET),
         NUVEI_API_ENDPOINT: cleanEnvValue(NUVEI_API_ENDPOINT),

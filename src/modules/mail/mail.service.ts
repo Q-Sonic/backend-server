@@ -61,6 +61,42 @@ export async function sendAccountChangeVerificationCode(to: string, code: string
     Logger.info(`Account change code email sent to ${to}`);
 }
 
+export async function sendWithdrawalRequestNotification(
+    artistName: string,
+    amount: number,
+    bankDetails: any
+): Promise<void> {
+    const env = getEnv();
+    const adminEmail = env.ADMIN_EMAIL || env.SMTP_USER; // Default to SMTP user if no admin email
+    if (!adminEmail) return;
+
+    const tx = getTransporter();
+    const subject = `⚠️ Nueva Solicitud de Retiro: ${artistName}`;
+    
+    const html = `
+        <h2>Nueva solicitud de retiro recibida</h2>
+        <p>El artista <strong>${artistName}</strong> ha solicitado un retiro.</p>
+        <p><strong>Monto:</strong> $${amount}</p>
+        <hr/>
+        <h3>Datos Bancarios:</h3>
+        <ul>
+            <li><strong>Banco:</strong> ${bankDetails.bankName}</li>
+            <li><strong>Cuenta:</strong> ${bankDetails.accountNumber} (${bankDetails.accountType})</li>
+            <li><strong>Titular:</strong> ${bankDetails.holderName}</li>
+            <li><strong>Documento:</strong> ${bankDetails.holderDocument}</li>
+        </ul>
+        <p>Por favor, procesa este pago y marca la solicitud como completada en el panel administrativo.</p>
+    `;
+
+    await tx.sendMail({
+        from: `Q-Sonic Billing <${env.SMTP_USER}>`,
+        to: adminEmail,
+        subject,
+        html,
+    });
+    Logger.info(`Withdrawal notification sent to admin: ${adminEmail}`);
+}
+
 function escapeHtml(s: string): string {
     return s
         .replace(/&/g, '&amp;')

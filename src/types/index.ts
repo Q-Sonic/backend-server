@@ -187,6 +187,8 @@ export interface ArtistProfileRecord {
     media?: ArtistProfileMediaItem[];
     /** Songs managed independently from gallery. */
     songs?: ArtistSongItem[];
+    /** Artist's current balance */
+    balance: number;
     /** Stats for dashboard */
     totalVisits?: number;
     /** Map of date (YYYY-MM-DD) -> count */
@@ -302,4 +304,48 @@ export interface PasswordResetRecord {
     expiresAt: FirebaseFirestore.Timestamp;
     verified: boolean;
     createdAt: FirebaseFirestore.Timestamp;
+}
+
+// ─── Wallet & Withdrawals ───────────────────────────────────────────────────
+import { TransactionType, WithdrawalStatus } from '../enum/payment.enum';
+
+export interface WalletTransactionRecord {
+    id: string;
+    artistId: string;
+    amount: number;
+    type: TransactionType;
+    description: string;
+    orderId?: string;
+    transactionId?: string;
+    createdAt: FirebaseFirestore.Timestamp;
+}
+
+export interface WithdrawalRequestRecord {
+    id: string;
+    artistId: string;
+    amount: number;
+    status: WithdrawalStatus;
+    bankDetails?: {
+        bankName: string;
+        accountNumber: string;
+        accountType: string;
+        holderName: string;
+        holderDocument: string;
+    };
+    adminNotes?: string;
+    processedAt?: FirebaseFirestore.Timestamp;
+    processedBy?: string;
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export interface WithdrawalRequestInput {
+    amount: number;
+    bankDetails: {
+        bankName: string;
+        accountNumber: string;
+        accountType: string;
+        holderName: string;
+        holderDocument: string;
+    };
 }

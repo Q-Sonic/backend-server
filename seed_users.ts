@@ -44,6 +44,13 @@ async function seedUsers() {
                 await db.collection('users').doc(oldUser.uid).delete();
                 await db.collection('artist_profiles').doc(oldUser.uid).delete();
                 await db.collection('client_profiles').doc(oldUser.uid).delete();
+
+                // Limpiar servicios y contratos viejos de este artista
+                const servicesBatch = await db.collection('artist_services').where('artistId', '==', oldUser.uid).get();
+                servicesBatch.forEach(doc => doc.ref.delete());
+                
+                const contractsBatch = await db.collection('contracts').where('artistId', '==', oldUser.uid).get();
+                contractsBatch.forEach(doc => doc.ref.delete());
             } catch (err) {}
 
             firebaseUser = await auth.createUser({
@@ -70,22 +77,32 @@ async function seedUsers() {
                     uid: firebaseUser.uid,
                     balance: 100,
                     displayName: user.displayName,
-                    services: [
-                        {
-                            id: 'service_standard_show',
-                            name: 'Show Estándar',
-                            description: 'Presentación de 45 minutos con equipo básico.',
-                            price: 350
-                        },
-                        {
-                            id: 'service_premium_show',
-                            name: 'Show Premium',
-                            description: 'Presentación de 90 minutos con iluminación y sonido profesional.',
-                            price: 500
-                        }
-                    ],
                     updatedAt: now,
                 });
+
+                // --- AGREGAR SERVICIOS A LA COLECCION INDEPENDIENTE ---
+                const services = [
+                    {
+                        artistId: firebaseUser.uid,
+                        name: 'Show Estándar',
+                        description: 'Presentación de 45 minutos con equipo básico.',
+                        price: 350,
+                        createdAt: now,
+                        updatedAt: now
+                    },
+                    {
+                        artistId: firebaseUser.uid,
+                        name: 'Show Premium',
+                        description: 'Presentación de 90 minutos con iluminación y sonido profesional.',
+                        price: 500,
+                        createdAt: now,
+                        updatedAt: now
+                    }
+                ];
+
+                for (const service of services) {
+                    await db.collection('artist_services').add(service);
+                }
             }
             console.log(`✅ Usuario sincronizado: ${user.email} (${user.role})`);
         }

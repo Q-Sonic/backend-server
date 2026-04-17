@@ -138,3 +138,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 seed_users.ts
+add_funds.ts
+get_admin_curl.ts
+get_curl.ts
+test_withdraw.ts

@@ -65,6 +65,21 @@ async function seedUsers() {
                 await db.collection('artist_profiles').doc(firebaseUser.uid).set({
                     uid: firebaseUser.uid,
                     balance: 100,
+                    displayName: user.displayName,
+                    services: [
+                        {
+                            id: 'service_standard_show',
+                            name: 'Show Estándar',
+                            description: 'Presentación de 45 minutos con equipo básico.',
+                            price: 350
+                        },
+                        {
+                            id: 'service_premium_show',
+                            name: 'Show Premium',
+                            description: 'Presentación de 90 minutos con iluminación y sonido profesional.',
+                            price: 500
+                        }
+                    ],
                     updatedAt: now,
                 });
             }

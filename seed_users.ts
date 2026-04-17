@@ -12,18 +12,21 @@ async function seedUsers() {
 
         const testUsers = [
             {
-                email: 'nutringest@gmail.com', // Artista
+                uid: 'nutri-artist-test-uid',
+                email: 'nutringest@gmail.com',
                 password: 'abc.12345',
                 displayName: 'José Nutri (Artista)',
                 role: UserRoleEnum.ARTISTA
             },
             {
-                email: 'stagego.admin@gmail.com', // NUEVO: Admin para probar
+                uid: 'admin-stagego-test-uid',
+                email: 'stagego.admin@gmail.com',
                 password: 'abc.12345',
                 displayName: 'Admin StageGo',
                 role: UserRoleEnum.ADMIN
             },
             {
+                uid: 'jose-cliente-test-uid',
                 email: 'sojoj6573@gmail.com',
                 password: 'abc.12345',
                 displayName: 'José Cliente (Test)',
@@ -44,6 +47,7 @@ async function seedUsers() {
             } catch (err) {}
 
             firebaseUser = await auth.createUser({
+                uid: user.uid,
                 email: user.email,
                 password: user.password,
                 displayName: user.displayName,
@@ -88,8 +92,8 @@ async function seedUsers() {
 
         // --- CREAR CONTRATOS PARA NUTRI ---
         console.log('--- Generando Contratos de Prueba ---');
-        const nutriId = (await auth.getUserByEmail('nutringest@gmail.com')).uid;
-        const clienteId = (await auth.getUserByEmail('sojoj6573@gmail.com')).uid;
+        const nutriId = 'nutri-artist-test-uid';
+        const clienteId = 'jose-cliente-test-uid';
         const now = admin.firestore.Timestamp.now();
 
         const testContracts = [

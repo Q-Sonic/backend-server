@@ -55,6 +55,8 @@ interface EnvConfig {
     NUVEI_LTP_SERVER_KEY: string;
     NUVEI_LTP_SERVER_SECRET: string;
     NUVEI_API_ENDPOINT: string;
+    /** Frontend DNS URL (e.g. http://localhost:5173 or https://q-sonic.vercel.app) */
+    FRONT_DNS: string;
 }
 
 export function getEnv(): EnvConfig {
@@ -76,6 +78,7 @@ export function getEnv(): EnvConfig {
         NUVEI_LTP_SERVER_KEY,
         NUVEI_LTP_SERVER_SECRET,
         NUVEI_API_ENDPOINT,
+        FRONT_DNS,
     } = process.env;
 
     return {
@@ -96,5 +99,6 @@ export function getEnv(): EnvConfig {
         NUVEI_LTP_SERVER_KEY: cleanEnvValue(NUVEI_LTP_SERVER_KEY),
         NUVEI_LTP_SERVER_SECRET: cleanEnvValue(NUVEI_LTP_SERVER_SECRET),
         NUVEI_API_ENDPOINT: cleanEnvValue(NUVEI_API_ENDPOINT),
+        FRONT_DNS: cleanEnvValue(FRONT_DNS) || 'https://q-sonic.vercel.app',
     };
 }

@@ -45,6 +45,8 @@ export const getFirestore = (): admin.firestore.Firestore => {
     return admin.firestore();
 };
 
+export const db: admin.firestore.Firestore = getFirestore();
+
 export const getAuth = (): admin.auth.Auth => {
     ensureReady();
     return admin.auth();

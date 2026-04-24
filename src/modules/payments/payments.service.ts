@@ -1,9 +1,7 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import { getEnv } from '../../config/env';
-import { db } from '../../config/firebase';
 import { admin } from '../../config/firebase';
-import { Logger } from '../../utils/logger.util';
 
 /**
  * Payout Request status type

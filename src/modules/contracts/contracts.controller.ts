@@ -80,4 +80,15 @@ export class ContractsController {
             sendError({ res, error: error.message, statusCode: 403 });
         }
     }
+
+    async signAll(req: AuthRequest, res: Response) {
+        if (!req.user) return sendError({ res, error: 'Unauthorized', statusCode: 401 });
+
+        try {
+            const results = await contractsService.bulkSignAccepted(req.user.uid);
+            sendSuccess(res, results, 'All pending contracts signed successfully');
+        } catch (error: any) {
+            sendError({ res, error: error.message, statusCode: 500 });
+        }
+    }
 }

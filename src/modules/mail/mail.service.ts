@@ -97,6 +97,94 @@ export async function sendWithdrawalRequestNotification(
     Logger.info(`Withdrawal notification sent to admin: ${adminEmail}`);
 }
 
+export async function sendWelcomeEmail(to: string, displayName: string): Promise<void> {
+    const env = getEnv();
+    const tx = getTransporter();
+    const subject = '¡Bienvenido a StageGo! 🎤';
+    
+    const html = `
+        <div style="font-family: sans-serif; color: #333;">
+            <h2>¡Hola ${escapeHtml(displayName)}!</h2>
+            <p>Gracias por unirte a <strong>StageGo</strong>, la plataforma que conecta el talento con las mejores oportunidades.</p>
+            <p>Tu cuenta ha sido creada con éxito. Ya podés iniciar sesión y completar tu perfil para empezar a recibir contrataciones.</p>
+            <br/>
+            <p>Si tenés alguna duda, estamos acá para ayudarte.</p>
+            <p>¡Muchos éxitos!</p>
+            <p>El equipo de StageGo</p>
+        </div>
+    `;
+
+    await tx.sendMail({
+        from: `StageGo <${env.SMTP_USER}>`,
+        to,
+        subject,
+        html,
+    });
+    Logger.info(`Welcome email sent to ${to}`);
+}
+
+export async function sendPasswordResetEmail(to: string, code: string, displayName: string): Promise<void> {
+    const env = getEnv();
+    const tx = getTransporter();
+    const subject = 'Restablecer tu contraseña — StageGo';
+    const ttl = ACCOUNT_CHANGE_CODE_TTL_MINUTES;
+
+    const html = `
+        <div style="font-family: sans-serif; color: #333;">
+            <h2>Hola ${escapeHtml(displayName)},</h2>
+            <p>Recibimos una solicitud para restablecer tu contraseña en StageGo.</p>
+            <p>Tu código de recuperación es:</p>
+            <p style="font-size:1.8rem; letter-spacing: 0.2rem; font-weight: bold; color: #007bff;">${escapeHtml(code)}</p>
+            <p>Este código expira en ${ttl} minutos.</p>
+            <p>Si no solicitaste este cambio, podés ignorar este correo de forma segura.</p>
+        </div>
+    `;
+
+    await tx.sendMail({
+        from: `StageGo <${env.SMTP_USER}>`,
+        to,
+        subject,
+        html,
+    });
+    Logger.info(`Password reset email sent to ${to}`);
+}
+
+export async function sendContractSignedNotification(
+    to: string, 
+    role: 'artist' | 'client',
+    details: { contractId: string; serviceName: string; eventName: string; artistName: string; clientName: string }
+): Promise<void> {
+    const env = getEnv();
+    const tx = getTransporter();
+    const subject = role === 'artist' 
+        ? `✅ ¡Contrato Confirmado! - ${details.eventName}`
+        : `✅ ¡Tu reserva está lista! - ${details.artistName}`;
+    
+    const html = `
+        <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
+            <h2 style="color: #28a745;">${role === 'artist' ? '¡Nueva contratación firmada!' : '¡Contrato formalizado exitosamente!'}</h2>
+            <p>Hola <strong>${role === 'artist' ? escapeHtml(details.artistName) : escapeHtml(details.clientName)}</strong>,</p>
+            <p>Se ha formalizado el contrato para el evento <strong>${escapeHtml(details.eventName)}</strong>.</p>
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 5px solid #28a745;">
+                <p style="margin: 0;"><strong>Servicio:</strong> ${escapeHtml(details.serviceName)}</p>
+                <p style="margin: 0;"><strong>${role === 'artist' ? 'Cliente' : 'Artista'}:</strong> ${role === 'artist' ? escapeHtml(details.clientName) : escapeHtml(details.artistName)}</p>
+                <p style="margin: 0;"><strong>ID Contrato:</strong> ${details.contractId}</p>
+            </div>
+            <p>Ya podés acceder a la plataforma para descargar el contrato en PDF y coordinar los detalles finales.</p>
+            <br/>
+            <p>Gracias por confiar en <strong>StageGo</strong>.</p>
+        </div>
+    `;
+
+    await tx.sendMail({
+        from: `StageGo Contracts <${env.SMTP_USER}>`,
+        to,
+        subject,
+        html,
+    });
+    Logger.info(`Contract signed notification sent to ${role}: ${to}`);
+}
+
 function escapeHtml(s: string): string {
     return s
         .replace(/&/g, '&amp;')

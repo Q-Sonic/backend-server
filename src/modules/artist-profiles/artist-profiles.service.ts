@@ -55,7 +55,9 @@ export class ArtistProfilesService {
         if (filters?.search) {
             const s = filters.search.toLowerCase();
             profiles = profiles.filter(p => 
-                p.biography.toLowerCase().includes(s) || 
+                (p.biography || '').toLowerCase().includes(s) || 
+                (p.city || '').toLowerCase().includes(s) ||
+                (p as any).name?.toLowerCase().includes(s) ||
                 (p as any).displayName?.toLowerCase().includes(s)
             );
         }
@@ -79,7 +81,7 @@ export class ArtistProfilesService {
 
         const media = input.media !== undefined ? input.media : existing?.media;
         const songs = input.songs !== undefined ? input.songs : existing?.songs;
-        const blockedDates = input.blockedDates !== undefined ? input.blockedDates : existing?.blockedDates;
+        const blockedDates = input.blockedDates !== undefined ? [...new Set(input.blockedDates)] : existing?.blockedDates;
         const featuredSong = input.featuredSong !== undefined ? input.featuredSong : existing?.featuredSong;
         const technicalRiderUrl = input.technicalRiderUrl !== undefined ? input.technicalRiderUrl : existing?.technicalRiderUrl;
 

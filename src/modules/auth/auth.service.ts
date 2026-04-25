@@ -9,7 +9,12 @@ import {
   ACCOUNT_CHANGE_SESSION_TTL_MINUTES,
   ACCOUNT_CHANGE_RESEND_COOLDOWN_SECONDS,
 } from '../../config/account-change.config';
-import { sendAccountChangeVerificationCode, isSmtpConfigured } from '../mail/mail.service';
+import { 
+  sendAccountChangeVerificationCode, 
+  isSmtpConfigured,
+  sendWelcomeEmail,
+  sendPasswordResetEmail,
+} from '../mail/mail.service';
 import * as crypto from 'crypto';
 import { Logger } from '../../utils/logger.util';
 
@@ -66,10 +71,17 @@ export class AuthService {
     await this.db.collection('users').doc(firebaseUser.uid).set(userRecord);
     Logger.success(`User registered: ${input.email} [UID: ${firebaseUser.uid}]`);
 
-    // 4. Generar código de verificación
+    // 4. Enviar correo de bienvenida (opcionalmente asíncrono para no bloquear el registro)
+    if (isSmtpConfigured()) {
+      sendWelcomeEmail(input.email, input.displayName).catch(err => 
+        Logger.error(`Error enviando correo de bienvenida a ${input.email}: ${err.message}`)
+      );
+    }
+
+    // 5. Generar código de verificación
     const verification = await this.generateEmailVerificationCode(firebaseUser.uid, input.email);
 
-    // 5. Hacer Login automático para obtener tokens
+    // 6. Hacer Login automático para obtener tokens
     const loginData = await this.login(input.email, input.password);
 
     const isDev = getEnv().NODE_ENV !== 'production';
@@ -465,7 +477,12 @@ export class AuthService {
 
     // Usamos el email como ID del documento para que sea único por solicitud activa
     await this.db.collection('passwordResets').doc(email).set(resetRecord);
-    Logger.info(`Password reset code generated for ${email}: ${code}`);
+    // Enviar correo de recuperación
+    if (isSmtpConfigured()) {
+      sendPasswordResetEmail(email, code, email.split('@')[0]).catch(err => 
+        Logger.error(`Error enviando correo de recuperación a ${email}: ${err.message}`)
+      );
+    }
 
     return resetRecord;
   }

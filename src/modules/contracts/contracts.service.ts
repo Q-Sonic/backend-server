@@ -7,6 +7,7 @@ import { UsersService } from '../users/users.service';
 import { ArtistProfilesService } from '../artist-profiles/artist-profiles.service';
 
 import { Logger } from '../../utils/logger.util';
+import { sendContractSignedNotification } from '../mail/mail.service';
 
 const COLLECTION = 'contracts';
 
@@ -57,6 +58,15 @@ export class ContractsService {
     async create(clientId: string, input: CreateContractInput): Promise<ContractRecord> {
         const now = admin.firestore.Timestamp.now();
         const eventDate = admin.firestore.Timestamp.fromDate(new Date(input.eventDetails.date));
+
+        // Validation: Artist service MUST have a contract linked
+        const serviceDoc = await this.db.collection('artist_services').doc(input.serviceId).get();
+        if (!serviceDoc.exists) throw new Error('El servicio seleccionado no existe');
+        
+        const serviceData = serviceDoc.data();
+        if (!serviceData?.contractId) {
+            throw new Error('Este servicio no puede ser contratado porque el artista aún no ha vinculado un contrato legal al mismo.');
+        }
 
         // Get artist rider if available
         let riderUrl: string | undefined;
@@ -123,10 +133,36 @@ export class ContractsService {
                 );
                 
                 updateData.contractUrl = contractUrl;
+
+                // --- Send Notifications ---
+                const serviceDoc = await this.db.collection('artist_services').doc(data.serviceId).get();
+                const serviceName = serviceDoc.data()?.name || 'Servicio Musical';
+
+                const details = {
+                    contractId: id,
+                    serviceName,
+                    eventName: data.eventDetails.name,
+                    artistName: artist?.displayName || 'Artista',
+                    clientName: client?.displayName || 'Cliente'
+                };
+
+                // Notification to Artist
+                if (artist?.email) {
+                    await sendContractSignedNotification(artist.email, 'artist', details);
+                }
+
+                // Notification to Client
+                if (client?.email) {
+                    await sendContractSignedNotification(client.email, 'client', details);
+                }
+
+                // --- Increment totalHires ---
+                await this.db.collection('artist_profiles').doc(data.artistId).update({
+                    totalHires: admin.firestore.FieldValue.increment(1)
+                });
+
             } catch (pdfErr) {
-                console.error('Failed to generate/upload contract PDF:', pdfErr);
-                // We proceed with status change even if PDF fails, 
-                // but usually you want to inform or retry.
+                console.error('Failed to generate PDF or send notifications:', pdfErr);
             }
         }
 
@@ -134,6 +170,33 @@ export class ContractsService {
         Logger.info(`Contract ${id} status changed: ${data.status} -> ${status}`);
         const updated = await ref.get();
         return { id: updated.id, ...updated.data() } as ContractRecord;
+    }
+
+    async bulkSignAccepted(artistId: string): Promise<{ successCount: number; errors: string[] }> {
+        const pendingSnapshot = await this.db.collection(COLLECTION)
+            .where('artistId', '==', artistId)
+            .where('status', '==', ContractStatus.PENDING)
+            .get();
+
+        if (pendingSnapshot.empty) {
+            return { successCount: 0, errors: ['No hay contratos pendientes para firmar'] };
+        }
+
+        let successCount = 0;
+        const errors: string[] = [];
+
+        for (const doc of pendingSnapshot.docs) {
+            try {
+                // Here we would ideally check if terms are accepted in the doc data
+                // For now, mirroring single updateStatus logic
+                await this.updateStatus(doc.id, artistId, ContractStatus.ACCEPTED);
+                successCount++;
+            } catch (err: any) {
+                errors.push(`Error en contrato ${doc.id}: ${err.message}`);
+            }
+        }
+
+        return { successCount, errors };
     }
 
     async addPayment(id: string, userId: string, input: AddPaymentInput): Promise<ContractRecord> {

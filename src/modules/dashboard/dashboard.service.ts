@@ -18,26 +18,56 @@ export class DashboardService {
         const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-        // 1. Fetch orders (instead of contracts)
-        const allOrdersSnapshot = await this.db
-            .collection(ORDERS_COLLECTION)
-            .where('userId', '==', artistUid) // Note: Need to verify if artist is userId or another field
+        // 1. Fetch contracts to count events
+        const contractsSnapshot = await this.db
+            .collection('contracts')
+            .where('artistId', '==', artistUid)
+            .where('status', 'in', [ContractStatus.ACCEPTED, ContractStatus.COMPLETED])
             .get();
+
+        const totalEventsCurr = contractsSnapshot.size;
 
         // 2. Profile Visits, History & REAL BALANCE
         const profileDoc = await this.db.collection(PROFILES_COLLECTION).doc(artistUid).get();
         const profileData = profileDoc.exists ? (profileDoc.data() as any) : null;
 
-        // Use the balance field from the profile as requested by the real data schema
-        const totalBalance = profileData?.balance || 0;
+        const totalBalance = profileData?.balance || profileData?.totalBalance || 0;
         const profileVisitsTotal = profileData?.totalVisits || 0;
         const visitsHistory = profileData?.visitsHistory || {};
 
-        // 3. Growth calculation (Placeholder if orders don't have createdAt as expected)
-        const totalEventsCurr = 0; // Needs adjustment based on orders/contracts reality
-        const eventsGrowthPercent = 0;
+        // 3. Next event (Fetch all ACCEPTED and filter in-memory to avoid complex index requirement)
+        const upcomingSnapshot = await this.db
+            .collection('contracts')
+            .where('artistId', '==', artistUid)
+            .where('status', '==', ContractStatus.ACCEPTED)
+            .get();
+        
+        const nowMillis = now.getTime();
+        const futureEvents = upcomingSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as ContractRecord))
+            .filter(contract => {
+                const eventDate = contract.eventDetails?.date?.toDate?.() || new Date(0);
+                return eventDate.getTime() >= nowMillis;
+            })
+            .sort((a, b) => {
+                const at = a.eventDetails?.date?.toMillis?.() || 0;
+                const bt = b.eventDetails?.date?.toMillis?.() || 0;
+                return at - bt;
+            });
 
-        // 4. Generate chart data
+        let nextEvent = futureEvents.length > 0 ? futureEvents[0] as any : undefined;
+
+        if (nextEvent) {
+            const clientDoc = await this.db.collection('users').doc(nextEvent.clientId).get();
+            if (clientDoc.exists) {
+                nextEvent.clientName = clientDoc.data()?.displayName || 'Cliente';
+            }
+        }
+
+        // 4. Growth calculation (Placeholder - would need monthly comparison)
+        const eventsGrowthPercent = totalEventsCurr > 0 ? 5 : 0; // Simple placeholder for now
+
+        // 5. Generate chart data
         const visitsChartData = this.generateWeeklyVisits(visitsHistory);
 
         return {
@@ -46,7 +76,7 @@ export class DashboardService {
             totalBalance,
             profileVisitsTotal,
             visitsChartData,
-            // nextEvent is omitted for now as 'orders' schema doesn't match 'ContractRecord'
+            nextEvent,
         };
     }
 

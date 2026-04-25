@@ -88,8 +88,12 @@ export interface ArtistServiceRecord {
     duration?: string;
     /** List of features (e.g., ['Equipo de sonido incluido', 'Músicos de apoyo']) */
     features?: string[];
-    /** Rider URL (PDF in Storage) */
+    /** Rider URL (PDF in Storage) - Snapshot manually or use ID */
     riderUrl?: string;
+    /** Linked technical rider from artist profile (ID/URL) */
+    technicalRiderId?: string;
+    /** Linked contract ID for this specific service */
+    contractId?: string;
     /** Cover image URL for service card/modal */
     imageUrl?: string;
     createdAt: FirebaseFirestore.Timestamp;
@@ -114,6 +118,8 @@ export interface CreateArtistServiceInput {
     duration?: string;
     features?: string[];
     imageUrl?: string;
+    contractId?: string;
+    technicalRiderId?: string;
 }
 
 export type UpdateArtistServiceInput = Partial<CreateArtistServiceInput>;
@@ -191,6 +197,8 @@ export interface ArtistProfileRecord {
     balance: number;
     /** Stats for dashboard */
     totalVisits?: number;
+    /** Total number of accepted/completed contracts */
+    totalHires?: number;
     /** Map of date (YYYY-MM-DD) -> count */
     visitsHistory?: Record<string, number>;
     createdAt: FirebaseFirestore.Timestamp;
@@ -275,6 +283,8 @@ export interface ExtendedContractDetail extends ContractRecord {
         email: string;
         phone: string;
     };
+    serviceName?: string;
+    artistName?: string;
     riderDownloadUrl?: string;
     contractDownloadUrl?: string;
 }

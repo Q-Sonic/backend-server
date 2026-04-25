@@ -142,4 +142,17 @@ router.patch('/:id/status', (req, res) => controller.updateStatus(req, res));
  */
 router.post('/:id/payments', (req, res) => controller.addPayment(req, res));
 
+/**
+ * @swagger
+ * /contracts/sign-all:
+ *   post:
+ *     summary: Firmar todos los contratos pendientes del artista
+ *     tags: [Contracts]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Contratos firmados con éxito
+ */
+router.post('/sign-all', roleGuard(UserRoleEnum.ARTISTA), (req, res) => controller.signAll(req, res));
+
 export default router;

@@ -1,7 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import { getEnv } from '../../config/env';
-import { admin, db } from '../../config/firebase';
+import { getFirestore, admin } from '../../config/firebase';
+import { Logger } from '../../utils/logger.util';
 
 /**
  * Payout Request status type
@@ -73,6 +74,7 @@ export class PaymentsService {
         
         // Nuvei usually sends status: 'success' or status_detail: 3 (Authorized)
         if (body.status === 'success' || transaction?.status === 'success') {
+            const db = getFirestore();
             const amount = transaction.amount;
             const dev_reference = order.dev_reference; // This should be the artistId or serviceId
 
@@ -80,24 +82,35 @@ export class PaymentsService {
             // Or we look up the order in our DB if we had saved it.
             // TEMPORARY: Assuming dev_reference is the service ID, we find the artist through the service.
             const serviceSnap = await db.collection('artist_services').doc(dev_reference).get();
-            if (!serviceSnap.exists) {
-                // If not a service, maybe it's a direct artist payment?
-                // For testing, let's try to see if dev_reference IS an artistId.
-                const artistSnap = await db.collection('artist_profiles').doc(dev_reference).get();
-                if (artistSnap.exists) {
-                    await this.updateArtistBalance(dev_reference, amount, `Pago recibido: ${order.description}`);
-                    return { success: true, message: 'Balance actualizado' };
+            if (serviceSnap.exists) {
+                const serviceData = serviceSnap.data();
+                const artistId = serviceData?.artistId;
+                if (artistId) {
+                    await this.updateArtistBalance(artistId, amount, `Pago por servicio: ${serviceData.name}`);
+                    return { success: true, message: 'Balance actualizado (Servicio)' };
                 }
-                throw new Error('No se pudo encontrar el destinatario del pago');
             }
 
-            const serviceData = serviceSnap.data();
-            const artistId = serviceData?.artistId;
-
-            if (artistId) {
-                await this.updateArtistBalance(artistId, amount, `Pago por servicio: ${serviceData.name}`);
-                return { success: true, message: 'Balance actualizado' };
+            // If not a service, search in contracts
+            const contractSnap = await db.collection('contracts').doc(dev_reference).get();
+            if (contractSnap.exists) {
+                const contractData = contractSnap.data();
+                const artistId = contractData?.artistId;
+                if (artistId) {
+                    // Update contract payment status if needed (optional but recommended)
+                    await this.updateArtistBalance(artistId, amount, `Pago por contrato: ${contractSnap.id}`);
+                    return { success: true, message: 'Balance actualizado (Contrato)' };
+                }
             }
+
+            // Last resort: check if dev_reference is an artistId directly
+            const artistSnap = await db.collection('artist_profiles').doc(dev_reference).get();
+            if (artistSnap.exists) {
+                await this.updateArtistBalance(dev_reference, amount, `Pago directo o no identificado: ${order.description}`);
+                return { success: true, message: 'Balance actualizado (Artista Directo)' };
+            }
+
+            throw new Error('No se pudo encontrar el destinatario del pago (ServiceId, ContractId o ArtistId)');
         }
 
         return { success: false, message: 'Transacción no exitosa o ignorada' };
@@ -107,9 +120,10 @@ export class PaymentsService {
      * Helper: Updates artist wallet balance and records transaction.
      */
     private static async updateArtistBalance(artistId: string, amount: number, description: string) {
+        const db = getFirestore();
         const artistRef = db.collection('artist_profiles').doc(artistId);
         
-        await db.runTransaction(async (t) => {
+        await db.runTransaction(async (t: admin.firestore.Transaction) => {
             const doc = await t.get(artistRef);
             const currentBalance = doc.exists ? (doc.data()?.totalBalance || 0) : 0;
             const newBalance = currentBalance + amount;
@@ -134,9 +148,10 @@ export class PaymentsService {
      * Deducts balance immediately and creates a PENDING request.
      */
     static async requestWithdraw(artistId: string, payload: { amount: number; bankDetails: any }) {
+        const db = getFirestore();
         const artistRef = db.collection('artist_profiles').doc(artistId);
 
-        return await db.runTransaction(async (t) => {
+        return await db.runTransaction(async (t: admin.firestore.Transaction) => {
             const doc = await t.get(artistRef);
             const currentBalance = doc.exists ? (doc.data()?.totalBalance || 0) : 0;
 
@@ -181,9 +196,10 @@ export class PaymentsService {
      * Reverts balance if REJECTED.
      */
     static async updateWithdrawalStatus(adminId: string, requestId: string, status: WithdrawalStatus, reason?: string) {
+        const db = getFirestore();
         const withdrawRef = db.collection('withdrawal_requests').doc(requestId);
 
-        return await db.runTransaction(async (t) => {
+        return await db.runTransaction(async (t: admin.firestore.Transaction) => {
             const withdrawDoc = await t.get(withdrawRef);
             if (!withdrawDoc.exists) throw new Error('Solicitud no encontrada');
 
@@ -235,6 +251,7 @@ export class PaymentsService {
      * Get withdrawals for an artist.
      */
     static async getArtistWithdrawals(artistId: string) {
+        const db = getFirestore();
         const snapshot = await db.collection('withdrawal_requests')
             .where('artistId', '==', artistId)
             .orderBy('createdAt', 'desc')
@@ -247,6 +264,7 @@ export class PaymentsService {
      * Get transactions for an artist.
      */
     static async getArtistTransactions(artistId: string) {
+        const db = getFirestore();
         const snapshot = await db.collection('wallet_transactions')
             .where('artistId', '==', artistId)
             .orderBy('createdAt', 'desc')
@@ -259,6 +277,7 @@ export class PaymentsService {
      * Get all withdrawals (for Admin).
      */
     static async getAllWithdrawals(status?: string) {
+        const db = getFirestore();
         let query: any = db.collection('withdrawal_requests');
         if (status) {
             query = query.where('status', '==', status);

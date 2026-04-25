@@ -87,7 +87,25 @@ export class EventsService {
             console.error('Error fetching client contact info:', e);
         }
 
-        // 2. Generate Temporary Download Links
+        // 2. Get Service Info
+        try {
+            const serviceDoc = await this.db.collection('artist_services').doc(data.serviceId).get();
+            if (serviceDoc.exists) {
+                detail.serviceName = serviceDoc.data()?.name || 'Servicio Musical';
+            }
+        } catch (e) {
+            console.error('Error fetching service info:', e);
+        }
+
+        // 3. Get Artist Info
+        try {
+            const artistUser = await this.usersService.findById(data.artistId);
+            detail.artistName = artistUser?.displayName || 'Artista';
+        } catch (e) {
+            console.error('Error fetching artist info:', e);
+        }
+
+        // 4. Generate Temporary Download Links
         if (data.riderUrl) {
             const riderPath = extractFilePathFromStorageUrl(data.riderUrl);
             if (riderPath) {

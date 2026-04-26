@@ -57,7 +57,7 @@ export class ArtistServicesService {
 
     async create(artistId: string, input: CreateArtistServiceInput): Promise<ArtistServiceRecord> {
         const now = admin.firestore.Timestamp.now();
-        const record = {
+        const record: Record<string, unknown> = {
             artistId,
             name: input.name.trim(),
             price: Number(input.price),
@@ -65,11 +65,11 @@ export class ArtistServicesService {
             duration: (input.duration ?? '').trim(),
             features: input.features ?? [],
             imageUrl: (input.imageUrl ?? '').trim(),
-            contractId: input.contractId,
-            technicalRiderId: input.technicalRiderId,
             createdAt: now,
             updatedAt: now,
         };
+        if (input.contractId !== undefined) record.contractId = input.contractId;
+        if (input.technicalRiderId !== undefined) record.technicalRiderId = input.technicalRiderId;
 
         const ref = await this.db.collection(COLLECTION).add(record);
         await this.syncMinPrice(artistId);

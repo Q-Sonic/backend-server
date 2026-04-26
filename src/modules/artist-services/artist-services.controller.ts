@@ -106,8 +106,6 @@ export async function createService(req: AuthRequest, res: Response): Promise<vo
                 parsedFeatures = [];
             }
         }
-        
-        console.log('body', body);
 
         if (!body.name || body.price == null) {
             sendError({ res, error: 'name and price are required', statusCode: 400 });

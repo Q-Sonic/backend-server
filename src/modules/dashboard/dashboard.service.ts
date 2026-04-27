@@ -3,6 +3,7 @@ import { DashboardStats, ContractRecord } from '../../types';
 import { ContractStatus } from '../../enum/contract.enum';
 
 const PROFILES_COLLECTION = 'artist_profiles';
+const VISITS_DAILY_COLLECTION = 'artist_profile_visits_daily';
 
 function parseUnknownDate(raw: unknown): Date | null {
     if (!raw) return null;
@@ -64,6 +65,13 @@ function isDateInCalendarMonth(d: Date, year: number, monthIndex0: number): bool
     return d.getFullYear() === year && d.getMonth() === monthIndex0;
 }
 
+function toDateKeyLocal(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 export class DashboardService {
     private db: admin.firestore.Firestore;
 
@@ -112,7 +120,6 @@ export class DashboardService {
             0,
         );
         const profileVisitsTotal = numberFromUnknown(profileData?.totalVisits ?? profileData?.visits, 0);
-        const visitsHistory = profileData?.visitsHistory || {};
 
         // 3. Next event (Fetch all ACCEPTED and filter in-memory to avoid complex index requirement)
         const upcomingSnapshot = await this.db
@@ -143,8 +150,8 @@ export class DashboardService {
             }
         }
 
-        // 4. Generate chart data
-        const visitsChartData = this.generateWeeklyVisits(visitsHistory);
+        // 4. Generate chart data from dedicated daily visits collection (fallback to legacy map)
+        const visitsChartData = await this.generateWeeklyVisits(artistUid, profileData?.visitsHistory || {});
 
         return {
             totalEvents: totalEventsCurr,
@@ -156,18 +163,31 @@ export class DashboardService {
         };
     }
 
-    private generateWeeklyVisits(history: Record<string, number>) {
+    private async generateWeeklyVisits(artistUid: string, legacyHistory: Record<string, number>) {
+        const dailyVisitsSnapshot = await this.db
+            .collection(VISITS_DAILY_COLLECTION)
+            .where('artistId', '==', artistUid)
+            .get();
+
+        const dailyCountByDate = new Map<string, number>();
+        dailyVisitsSnapshot.docs.forEach((doc) => {
+            const data = doc.data() as { date?: unknown; count?: unknown };
+            const dateKey = typeof data.date === 'string' ? data.date : '';
+            if (!dateKey) return;
+            dailyCountByDate.set(dateKey, numberFromUnknown(data.count, 0));
+        });
+
         const result = [];
         const daysShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         
         for (let i = 6; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
-            const dateStr = d.toISOString().split('T')[0];
+            const dateStr = toDateKeyLocal(d);
             const dayName = daysShort[d.getDay()];
             result.push({
                 day: dayName,
-                count: history[dateStr] || 0
+                count: dailyCountByDate.get(dateStr) ?? numberFromUnknown(legacyHistory?.[dateStr], 0)
             });
         }
         return result;

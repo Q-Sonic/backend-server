@@ -92,7 +92,12 @@ export async function getArtistProfileById(req: AuthRequest, res: Response): Pro
 
         // Increment visit if viewed by client or different artist
         if (req.user?.uid !== id) {
-            artistProfilesService.incrementVisits(id).catch(console.error);
+            try {
+                await artistProfilesService.incrementVisits(id, String(req.user?.uid || ''));
+            } catch (visitErr) {
+                // Do not fail profile response if analytics write fails.
+                console.error('[ArtistProfiles] Failed to increment visits:', visitErr);
+            }
         }
 
         sendSuccess(res, profile);

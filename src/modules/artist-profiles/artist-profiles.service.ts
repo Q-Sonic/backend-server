@@ -9,6 +9,8 @@ import {
 import { ContractStatus } from '../../enum/contract.enum';
 
 const COLLECTION = 'artist_profiles';
+const VISITS_DAILY_COLLECTION = 'artist_profile_visits_daily';
+const UNIQUE_VISITS_DAILY_COLLECTION = 'artist_profile_unique_visits_daily';
 
 const emptySocialNetworks: SocialNetworks = {};
 
@@ -240,24 +242,58 @@ export class ArtistProfilesService {
         return availability;
     }
 
-    /** Increment visit count and daily history. */
-    async incrementVisits(uid: string): Promise<void> {
-        const ref = this.db.collection(COLLECTION).doc(uid);
-        const todayStr = new Date().toISOString().split('T')[0];
+    /** Increment unique visit count once per viewer per artist per day. */
+    async incrementVisits(uid: string, viewerUid: string): Promise<void> {
+        if (!viewerUid || viewerUid === uid) return;
+
+        const profileRef = this.db.collection(COLLECTION).doc(uid);
+        const now = admin.firestore.Timestamp.now();
+        const todayStr = this.toDateKey(new Date());
+        const dailyDocId = `${uid}_${todayStr}`;
+        const dailyRef = this.db.collection(VISITS_DAILY_COLLECTION).doc(dailyDocId);
+        const uniqueVisitDocId = `${uid}_${viewerUid}_${todayStr}`;
+        const uniqueVisitRef = this.db.collection(UNIQUE_VISITS_DAILY_COLLECTION).doc(uniqueVisitDocId);
 
         await this.db.runTransaction(async (transaction) => {
-            const doc = await transaction.get(ref);
-            if (!doc.exists) return;
+            const profileDoc = await transaction.get(profileRef);
+            if (!profileDoc.exists) return;
+            const dailyDoc = await transaction.get(dailyRef);
+            const uniqueVisitDoc = await transaction.get(uniqueVisitRef);
+            if (uniqueVisitDoc.exists) {
+                // Already counted this viewer today for this artist.
+                return;
+            }
 
-            const data = doc.data() as ArtistProfileRecord;
-            const currentTotal = (data as any).totalVisits || 0;
-            const currentHistory = (data as any).visitsHistory || {};
-            const todayCount = currentHistory[todayStr] || 0;
+            const profileData = profileDoc.data() as ArtistProfileRecord;
+            const currentTotal = (profileData as any).totalVisits || 0;
+            const currentDailyCount = dailyDoc.exists
+                ? Number((dailyDoc.data() as { count?: number }).count ?? 0)
+                : 0;
+            const nextDailyCount = currentDailyCount + 1;
 
-            transaction.update(ref, {
+            transaction.update(profileRef, {
                 totalVisits: currentTotal + 1,
-                [`visitsHistory.${todayStr}`]: todayCount + 1,
-                updatedAt: admin.firestore.Timestamp.now(),
+                updatedAt: now,
+            });
+
+            transaction.set(
+                dailyRef,
+                {
+                    artistId: uid,
+                    date: todayStr,
+                    count: nextDailyCount,
+                    createdAt: dailyDoc.exists ? (dailyDoc.data() as { createdAt?: unknown }).createdAt ?? now : now,
+                    updatedAt: now,
+                },
+                { merge: true }
+            );
+
+            transaction.set(uniqueVisitRef, {
+                artistId: uid,
+                viewerId: viewerUid,
+                date: todayStr,
+                createdAt: now,
+                updatedAt: now,
             });
         });
     }

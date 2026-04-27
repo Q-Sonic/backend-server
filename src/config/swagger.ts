@@ -156,6 +156,8 @@ const options: swaggerJsdoc.Options = {
                         id: { type: 'string', example: 'fileId123' },
                         artistId: { type: 'string', example: 'artistUid123' },
                         type: { type: 'string', enum: ['contract', 'technical_rider'], example: 'contract' },
+                        name: { type: 'string', example: 'Contrato show acústico' },
+                        description: { type: 'string', example: 'Condiciones estándar para formato acústico.' },
                         originalName: { type: 'string', example: 'Contrato General.pdf' },
                         fileName: { type: 'string', example: '1714263200000_Contrato_General.pdf' },
                         mimeType: { type: 'string', example: 'application/pdf' },

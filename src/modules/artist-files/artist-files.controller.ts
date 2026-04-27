@@ -9,6 +9,16 @@ const ALLOWED_FILE_TYPES = ['application/pdf'];
 const artistFilesService = new ArtistFilesService();
 const artistServicesService = new ArtistServicesService();
 
+function bodyHasKey(body: Record<string, unknown>, key: string): boolean {
+    return body != null && Object.prototype.hasOwnProperty.call(body, key);
+}
+
+function getUploadedFile(req: AuthRequest): Express.Multer.File | undefined {
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const list = files?.file;
+    return Array.isArray(list) && list.length > 0 ? list[0] : undefined;
+}
+
 function getArtistId(req: AuthRequest): string {
     const uid = req.user?.uid;
     if (!uid) throw new Error('Unauthorized');
@@ -38,7 +48,11 @@ export async function uploadArtistFile(req: AuthRequest, res: Response): Promise
             return;
         }
 
-        const created = await artistFilesService.create(artistId, { type, file });
+        const body = req.body as Record<string, unknown>;
+        const name = bodyHasKey(body, 'name') ? String(body.name ?? '') : undefined;
+        const description = bodyHasKey(body, 'description') ? String(body.description ?? '') : undefined;
+
+        const created = await artistFilesService.create(artistId, { type, file, name, description });
         sendCreated(res, created, 'Artist file uploaded');
     } catch (err) {
         if (err instanceof Error && err.message === 'Unauthorized') {
@@ -75,22 +89,39 @@ export async function listArtistFiles(req: AuthRequest, res: Response): Promise<
 export async function replaceArtistFile(req: AuthRequest, res: Response): Promise<void> {
     try {
         const artistId = getArtistId(req);
-        const file = req.file;
-        if (!file) {
-            sendError({ res, error: 'file is required', statusCode: 400 });
-            return;
+        const file = getUploadedFile(req);
+        const body = req.body as Record<string, unknown>;
+        const name = bodyHasKey(body, 'name') ? String(body.name ?? '') : undefined;
+        const descriptionSent = bodyHasKey(body, 'description');
+        const description = descriptionSent ? String(body.description ?? '') : undefined;
+
+        if (file) {
+            if (!ALLOWED_FILE_TYPES.includes(file.mimetype)) {
+                sendError({ res, error: 'Invalid document format. Only PDF is allowed', statusCode: 400 });
+                return;
+            }
+            if (file.size > MAX_PDF_SIZE) {
+                sendError({ res, error: 'File too large. Maximum size is 10 MB', statusCode: 400 });
+                return;
+            }
         }
-        if (!ALLOWED_FILE_TYPES.includes(file.mimetype)) {
-            sendError({ res, error: 'Invalid document format. Only PDF is allowed', statusCode: 400 });
-            return;
-        }
-        if (file.size > MAX_PDF_SIZE) {
-            sendError({ res, error: 'File too large. Maximum size is 10 MB', statusCode: 400 });
+
+        if (!file && name === undefined && !descriptionSent) {
+            sendError({
+                res,
+                error: 'Provide a PDF file and/or name or description to update',
+                statusCode: 400,
+            });
             return;
         }
 
-        const updated = await artistFilesService.replace(String(req.params.id), artistId, { file });
-        sendSuccess(res, updated, 'Artist file replaced');
+        const updated = await artistFilesService.update(String(req.params.id), artistId, {
+            file,
+            name,
+            description,
+            descriptionSent,
+        });
+        sendSuccess(res, updated, 'Artist file updated');
     } catch (err) {
         if (err instanceof Error && err.message === 'Unauthorized') {
             sendForbidden(res, 'Acceso denegado');

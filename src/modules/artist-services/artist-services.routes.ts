@@ -26,11 +26,20 @@ router.use(authMiddleware);
  * /artist-services:
  *   get:
  *     tags: [Artist Services]
- *     summary: Listar mis servicios (solo artistas)
+ *     summary: Listar mis servicios (incluye contract y technicalRider)
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200:
  *         description: Lista de servicios
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/ArtistServiceRecord' }
  */
 router.get('/', listMyServices);
 
@@ -56,7 +65,7 @@ router.get('/all/:artistId', listAllServicesByArtistId);
  * /artist-services/{id}:
  *   get:
  *     tags: [Artist Services]
- *     summary: Obtener detalle de un servicio
+ *     summary: Obtener detalle de un servicio (incluye contract y technicalRider)
  *     parameters:
  *       - in: path
  *         name: id
@@ -65,6 +74,13 @@ router.get('/all/:artistId', listAllServicesByArtistId);
  *     responses:
  *       200:
  *         description: Detalle del servicio
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/ArtistServiceRecord' }
  */
 router.get('/:id', getServiceById);
 
@@ -73,7 +89,7 @@ router.get('/:id', getServiceById);
  * /artist-services:
  *   post:
  *     tags: [Artist Services]
- *     summary: Crear un nuevo servicio musical
+ *     summary: Crear un nuevo servicio musical (requiere contractId y technicalRiderId)
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
@@ -81,13 +97,15 @@ router.get('/:id', getServiceById);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name, price]
+ *             required: [name, price, contractId, technicalRiderId]
  *             properties:
  *               name: { type: string, example: 'Show en vivo' }
  *               price: { type: number, example: 500 }
  *               description: { type: string, example: 'Presentación completa...' }
  *               duration: { type: string, example: '60-90 min' }
  *               features: { type: array, items: { type: string }, example: ['Equipo de sonido incluido', 'Luces'] }
+ *               contractId: { type: string, example: 'fileContract123' }
+ *               technicalRiderId: { type: string, example: 'fileRider123' }
  *     responses:
  *       201:
  *         description: Servicio creado
@@ -99,7 +117,7 @@ router.post('/', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), create
  * /artist-services/{id}:
  *   put:
  *     tags: [Artist Services]
- *     summary: Actualizar un servicio existente
+ *     summary: Actualizar un servicio existente (valida ownership/tipo de archivos si envias IDs)
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
@@ -117,6 +135,8 @@ router.post('/', roleGuard(UserRoleEnum.ARTISTA), upload.single('image'), create
  *               description: { type: string }
  *               duration: { type: string }
  *               features: { type: array, items: { type: string } }
+ *               contractId: { type: string, example: 'fileContract123' }
+ *               technicalRiderId: { type: string, example: 'fileRider123' }
  *     responses:
  *       200:
  *         description: Servicio actualizado

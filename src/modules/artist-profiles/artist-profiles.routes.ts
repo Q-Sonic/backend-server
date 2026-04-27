@@ -69,6 +69,10 @@ router.get('/me', roleGuard(UserRoleEnum.ARTISTA), getMyProfile);
  *         in: query
  *         schema: { type: string, enum: [true, false] }
  *         description: Mostrar solo artistas disponibles hoy
+ *       - name: date
+ *         in: query
+ *         schema: { type: string, example: '2026-04-26' }
+ *         description: Fecha local del usuario (YYYY-MM-DD) para evaluar disponibilidad
  *     responses:
  *       200:
  *         description: Lista de perfiles de artistas filtrada

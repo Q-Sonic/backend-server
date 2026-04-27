@@ -1,5 +1,7 @@
 import { getFirestore, admin } from '../../config/firebase';
 import {
+    ArtistFileRecord,
+    ArtistFileType,
     ArtistServiceRecord,
     CreateArtistServiceInput,
     UpdateArtistServiceInput,
@@ -8,6 +10,7 @@ import { StorageService } from '../storage/storage.service';
 import { extractFilePathFromStorageUrl } from '../../helper/storage';
 
 const COLLECTION = 'artist_services';
+const ARTIST_FILES_COLLECTION = 'artist_files';
 
 export class ArtistServicesService {
     private db: admin.firestore.Firestore;
@@ -18,6 +21,60 @@ export class ArtistServicesService {
         this.storageService = new StorageService();
     }
 
+    private async validateArtistFileOwnership(
+        fileId: string,
+        artistId: string,
+        expectedType: ArtistFileType
+    ): Promise<ArtistFileRecord> {
+        const fileDoc = await this.db.collection(ARTIST_FILES_COLLECTION).doc(fileId).get();
+        if (!fileDoc.exists) {
+            throw new Error(`Referenced ${expectedType} file does not exist`);
+        }
+
+        const fileData = { id: fileDoc.id, ...fileDoc.data() } as ArtistFileRecord;
+        if (fileData.artistId !== artistId) {
+            throw new Error(`Referenced ${expectedType} file does not belong to the artist`);
+        }
+        if (fileData.type !== expectedType) {
+            throw new Error(`Referenced file is not a valid ${expectedType}`);
+        }
+
+        return fileData;
+    }
+
+    private async hydrateServiceFiles(services: ArtistServiceRecord[]): Promise<ArtistServiceRecord[]> {
+        const ids = new Set<string>();
+        for (const service of services) {
+            if (service.contractId) ids.add(service.contractId);
+            if (service.technicalRiderId) ids.add(service.technicalRiderId);
+        }
+
+        if (ids.size === 0) {
+            return services.map((service) => ({
+                ...service,
+                contract: null,
+                technicalRider: null,
+            }));
+        }
+
+        const refs = [...ids].map((id) => this.db.collection(ARTIST_FILES_COLLECTION).doc(id));
+        const docs = await this.db.getAll(...refs);
+        const filesById = new Map<string, ArtistFileRecord>();
+        for (const doc of docs) {
+            if (!doc.exists) continue;
+            const file = { id: doc.id, ...doc.data() } as ArtistFileRecord;
+            filesById.set(file.id, file);
+        }
+
+        return services.map((service) => ({
+            ...service,
+            contract: service.contractId ? filesById.get(service.contractId) ?? null : null,
+            technicalRider: service.technicalRiderId
+                ? filesById.get(service.technicalRiderId) ?? null
+                : null,
+        }));
+    }
+
     async findAllByArtistId(artistId: string): Promise<ArtistServiceRecord[]> {
         // Firestore: composite index on (artistId, createdAt) may be required; create via console if needed
         const snapshot = await this.db
@@ -25,13 +82,15 @@ export class ArtistServicesService {
             .where('artistId', '==', artistId)
             .get();
 
-        return snapshot.docs
+        const services = snapshot.docs
             .map((doc) => ({ id: doc.id, ...doc.data() } as ArtistServiceRecord))
             .sort((a, b) => {
                 const at = a.createdAt?.toMillis?.() ?? 0;
                 const bt = b.createdAt?.toMillis?.() ?? 0;
                 return bt - at;
-        });
+            });
+
+        return this.hydrateServiceFiles(services);
     }
 
     async findById(id: string, artistId: string): Promise<ArtistServiceRecord> {
@@ -43,7 +102,8 @@ export class ArtistServicesService {
             throw new Error('Artist service not found');
         }
 
-        return { id: doc.id, ...data };
+        const [hydrated] = await this.hydrateServiceFiles([{ id: doc.id, ...data } as ArtistServiceRecord]);
+        return hydrated;
     }
 
     private async syncMinPrice(artistId: string): Promise<void> {
@@ -56,6 +116,15 @@ export class ArtistServicesService {
     }
 
     async create(artistId: string, input: CreateArtistServiceInput): Promise<ArtistServiceRecord> {
+        if (!input.contractId) {
+            throw new Error('contractId is required');
+        }
+        if (!input.technicalRiderId) {
+            throw new Error('technicalRiderId is required');
+        }
+        await this.validateArtistFileOwnership(input.contractId, artistId, 'contract');
+        await this.validateArtistFileOwnership(input.technicalRiderId, artistId, 'technical_rider');
+
         const now = admin.firestore.Timestamp.now();
         const record: Record<string, unknown> = {
             artistId,
@@ -65,15 +134,16 @@ export class ArtistServicesService {
             duration: (input.duration ?? '').trim(),
             features: input.features ?? [],
             imageUrl: (input.imageUrl ?? '').trim(),
+            contractId: input.contractId,
+            technicalRiderId: input.technicalRiderId,
             createdAt: now,
             updatedAt: now,
         };
-        if (input.contractId !== undefined) record.contractId = input.contractId;
-        if (input.technicalRiderId !== undefined) record.technicalRiderId = input.technicalRiderId;
 
         const ref = await this.db.collection(COLLECTION).add(record);
         await this.syncMinPrice(artistId);
-        return { id: ref.id, ...record } as ArtistServiceRecord;
+        const [hydrated] = await this.hydrateServiceFiles([{ id: ref.id, ...record } as ArtistServiceRecord]);
+        return hydrated;
     }
 
     async update(
@@ -87,6 +157,15 @@ export class ArtistServicesService {
 
         const data = doc.data() as { artistId: string };
         if (data.artistId !== artistId) throw new Error('Artist service not found');
+
+        if (input.contractId !== undefined) {
+            if (!input.contractId) throw new Error('contractId cannot be empty');
+            await this.validateArtistFileOwnership(input.contractId, artistId, 'contract');
+        }
+        if (input.technicalRiderId !== undefined) {
+            if (!input.technicalRiderId) throw new Error('technicalRiderId cannot be empty');
+            await this.validateArtistFileOwnership(input.technicalRiderId, artistId, 'technical_rider');
+        }
 
         const updates: Record<string, unknown> = {
             updatedAt: admin.firestore.Timestamp.now(),
@@ -103,7 +182,30 @@ export class ArtistServicesService {
         await ref.update(updates);
         await this.syncMinPrice(artistId);
         const updated = await ref.get();
-        return { id: updated.id, ...updated.data() } as ArtistServiceRecord;
+        const [hydrated] = await this.hydrateServiceFiles([
+            { id: updated.id, ...updated.data() } as ArtistServiceRecord,
+        ]);
+        return hydrated;
+    }
+
+    async detachFileReferences(artistId: string, fileId: string, fileType: ArtistFileType): Promise<void> {
+        const fieldToUnset = fileType === 'contract' ? 'contractId' : 'technicalRiderId';
+        const snapshot = await this.db
+            .collection(COLLECTION)
+            .where('artistId', '==', artistId)
+            .where(fieldToUnset, '==', fileId)
+            .get();
+
+        if (snapshot.empty) return;
+
+        const batch = this.db.batch();
+        snapshot.docs.forEach((doc) => {
+            batch.update(doc.ref, {
+                [fieldToUnset]: admin.firestore.FieldValue.delete(),
+                updatedAt: admin.firestore.Timestamp.now(),
+            });
+        });
+        await batch.commit();
     }
 
     async delete(id: string, artistId: string): Promise<void> {

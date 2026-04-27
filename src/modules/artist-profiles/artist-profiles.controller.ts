@@ -24,14 +24,35 @@ function getUid(req: AuthRequest): string {
 /** GET list: all artist profiles with filters (cliente, admin, organizacion, soporte) */
 export async function listArtistProfiles(req: AuthRequest, res: Response): Promise<void> {
     try {
-        const { genre, city, minPrice, maxPrice, search, availableToday } = req.query;
+        const { genre, city, minPrice, maxPrice, search, availableToday, date } = req.query;
+        const parsedMinPrice = minPrice ? Number(minPrice) : undefined;
+        const parsedMaxPrice = maxPrice ? Number(maxPrice) : undefined;
+
+        if (parsedMinPrice !== undefined && (!Number.isFinite(parsedMinPrice) || parsedMinPrice < 0)) {
+            sendError({ res, error: 'minPrice must be a non-negative number', statusCode: 400 });
+            return;
+        }
+        if (parsedMaxPrice !== undefined && (!Number.isFinite(parsedMaxPrice) || parsedMaxPrice < 0)) {
+            sendError({ res, error: 'maxPrice must be a non-negative number', statusCode: 400 });
+            return;
+        }
+        if (
+            parsedMinPrice !== undefined &&
+            parsedMaxPrice !== undefined &&
+            parsedMinPrice > parsedMaxPrice
+        ) {
+            sendError({ res, error: 'minPrice cannot be greater than maxPrice', statusCode: 400 });
+            return;
+        }
 
         const filters = {
-            genre: typeof genre === 'string' ? genre : undefined,
-            city: typeof city === 'string' ? city : undefined,
-            minPrice: minPrice ? Number(minPrice) : undefined,
-            maxPrice: maxPrice ? Number(maxPrice) : undefined,
+            genre: typeof genre === 'string' ? genre.trim() : undefined,
+            city: typeof city === 'string' ? city.trim() : undefined,
+            minPrice: parsedMinPrice,
+            maxPrice: parsedMaxPrice,
             search: typeof search === 'string' ? search : undefined,
+            availableToday: availableToday === 'true' ? true : undefined,
+            date: typeof date === 'string' ? date : undefined,
         };
 
         let profiles = await artistProfilesService.listAll(filters);
@@ -43,22 +64,6 @@ export async function listArtistProfiles(req: AuthRequest, res: Response): Promi
             ...p,
             displayName: displayNames[p.uid] ?? '',
         }));
-
-        // 2. Filter by "Available Today" if needed
-        if (availableToday === 'true') {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const filtered = [];
-            for (const item of list) {
-                const availability = await artistProfilesService.getAvailability(item.uid);
-                const isUnavailable = availability.blocked.includes(todayStr) || 
-                                    availability.reserved.includes(todayStr) || 
-                                    availability.pending.includes(todayStr);
-                if (!isUnavailable) {
-                    filtered.push(item);
-                }
-            }
-            list = filtered;
-        }
 
         sendSuccess(res, list);
     } catch (err: any) {
@@ -87,7 +92,12 @@ export async function getArtistProfileById(req: AuthRequest, res: Response): Pro
 
         // Increment visit if viewed by client or different artist
         if (req.user?.uid !== id) {
-            artistProfilesService.incrementVisits(id).catch(console.error);
+            try {
+                await artistProfilesService.incrementVisits(id, String(req.user?.uid || ''));
+            } catch (visitErr) {
+                // Do not fail profile response if analytics write fails.
+                console.error('[ArtistProfiles] Failed to increment visits:', visitErr);
+            }
         }
 
         sendSuccess(res, profile);

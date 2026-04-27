@@ -134,6 +134,10 @@ export interface ArtistFileRecord {
     id: string;
     artistId: string;
     type: ArtistFileType;
+    /** User-facing label (contract / rider title). Optional on legacy records. */
+    name?: string;
+    /** Optional notes; may be omitted or empty. */
+    description?: string;
     originalName: string;
     fileName: string;
     mimeType: string;

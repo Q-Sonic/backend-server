@@ -70,6 +70,12 @@ router.get('/', listArtistFiles);
  *               type:
  *                 type: string
  *                 enum: [contract, technical_rider]
+ *               name:
+ *                 type: string
+ *                 description: Optional display name for the document
+ *               description:
+ *                 type: string
+ *                 description: Optional notes (may be empty)
  *     responses:
  *       201:
  *         description: Archivo creado
@@ -88,7 +94,7 @@ router.post('/', upload.single('file'), uploadArtistFile);
  * /artist-files/{id}:
  *   put:
  *     tags: [Artist Files]
- *     summary: Reemplazar archivo del artista por un nuevo PDF
+ *     summary: Actualizar archivo (PDF opcional) y/o nombre y descripción
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
@@ -101,11 +107,17 @@ router.post('/', upload.single('file'), uploadArtistFile);
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [file]
  *             properties:
  *               file:
  *                 type: string
  *                 format: binary
+ *                 description: Optional; omit to only change name/description
+ *               name:
+ *                 type: string
+ *                 description: Display name (required non-empty when field is sent)
+ *               description:
+ *                 type: string
+ *                 description: Optional; send empty string to clear stored description
  *     responses:
  *       200:
  *         description: Archivo actualizado
@@ -117,7 +129,7 @@ router.post('/', upload.single('file'), uploadArtistFile);
  *                 success: { type: boolean, example: true }
  *                 data: { $ref: '#/components/schemas/ArtistFileRecord' }
  */
-router.put('/:id', upload.single('file'), replaceArtistFile);
+router.put('/:id', upload.fields([{ name: 'file', maxCount: 1 }]), replaceArtistFile);
 
 /**
  * @swagger

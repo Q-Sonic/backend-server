@@ -25,6 +25,50 @@ export class ArtistProfilesService {
         return { uid: doc.id, ...doc.data() } as ArtistProfileRecord;
     }
 
+    private normalizeText(value?: string): string {
+        return (value ?? '').trim().toLowerCase();
+    }
+
+    private toDateKey(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    private chunkArray<T>(arr: T[], size: number): T[][] {
+        const chunks: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) {
+            chunks.push(arr.slice(i, i + size));
+        }
+        return chunks;
+    }
+
+    private async getServicesByArtistIds(
+        artistIds: string[]
+    ): Promise<Map<string, Array<{ price?: number }>>> {
+        const result = new Map<string, Array<{ price?: number }>>();
+        if (artistIds.length === 0) return result;
+
+        const chunks = this.chunkArray(artistIds, 30);
+        for (const ids of chunks) {
+            const snapshot = await this.db
+                .collection('artist_services')
+                .where('artistId', 'in', ids)
+                .get();
+            snapshot.docs.forEach((doc) => {
+                const data = doc.data() as { artistId?: string; price?: number };
+                const artistId = data.artistId;
+                if (!artistId) return;
+                const current = result.get(artistId) ?? [];
+                current.push({ price: data.price });
+                result.set(artistId, current);
+            });
+        }
+
+        return result;
+    }
+
     /** List and filter artist profiles (for client/admin browse). */
     async listAll(filters?: { 
         genre?: string; 
@@ -32,36 +76,79 @@ export class ArtistProfilesService {
         minPrice?: number; 
         maxPrice?: number; 
         search?: string;
+        availableToday?: boolean;
+        date?: string;
     }): Promise<ArtistProfileRecord[]> {
-        let query: admin.firestore.Query = this.db.collection(COLLECTION);
-
-        if (filters?.genre) {
-            query = query.where('genre', '==', filters.genre);
-        }
-        if (filters?.city) {
-            query = query.where('city', '==', filters.city);
-        }
-        if (filters?.minPrice !== undefined) {
-            query = query.where('minPrice', '>=', filters.minPrice);
-        }
-        if (filters?.maxPrice !== undefined) {
-            query = query.where('minPrice', '<=', filters.maxPrice);
-        }
-
-        const snapshot = await query.get();
+        const snapshot = await this.db.collection(COLLECTION).get();
         let profiles = snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() } as ArtistProfileRecord));
 
-        // Basic text search in memory for now if search string is provided
+        if (filters?.genre) {
+            const normalizedGenre = this.normalizeText(filters.genre);
+            profiles = profiles.filter((p) => this.normalizeText(p.genre) === normalizedGenre);
+        }
+
+        if (filters?.city) {
+            const normalizedCity = this.normalizeText(filters.city);
+            profiles = profiles.filter((p) => this.normalizeText(p.city) === normalizedCity);
+        }
+
         if (filters?.search) {
-            const s = filters.search.toLowerCase();
+            const s = this.normalizeText(filters.search);
             profiles = profiles.filter(p => 
-                (p.biography || '').toLowerCase().includes(s) || 
-                (p.city || '').toLowerCase().includes(s) ||
+                this.normalizeText(p.biography).includes(s) || 
+                this.normalizeText(p.city).includes(s) ||
                 (p as any).name?.toLowerCase().includes(s) ||
                 (p as any).displayName?.toLowerCase().includes(s)
             );
         }
 
+        const needsServiceFiltering =
+            filters?.minPrice !== undefined || filters?.maxPrice !== undefined || filters?.availableToday === true;
+        if (!needsServiceFiltering) return profiles;
+
+        const servicesByArtistId = await this.getServicesByArtistIds(profiles.map((p) => p.uid));
+        const dateKey = filters?.date
+            ? filters.date
+            : this.toDateKey(new Date());
+        const availableTodayCache = new Map<string, boolean>();
+
+        const filteredProfiles: ArtistProfileRecord[] = [];
+        for (const profile of profiles) {
+            const services = servicesByArtistId.get(profile.uid) ?? [];
+            const hasServices = services.length > 0;
+            if (!hasServices) {
+                continue;
+            }
+
+            if (filters?.minPrice !== undefined || filters?.maxPrice !== undefined) {
+                const hasMatchingService = services.some((service) => {
+                    const price = Number(service.price);
+                    if (!Number.isFinite(price)) return false;
+                    if (filters?.minPrice !== undefined && price < filters.minPrice) return false;
+                    if (filters?.maxPrice !== undefined && price > filters.maxPrice) return false;
+                    return true;
+                });
+                if (!hasMatchingService) continue;
+            }
+
+            if (filters?.availableToday === true) {
+                let isAvailableToday = availableTodayCache.get(profile.uid);
+                if (isAvailableToday === undefined) {
+                    const availability = await this.getAvailability(profile.uid);
+                    const isUnavailable =
+                        availability.blocked.includes(dateKey) ||
+                        availability.reserved.includes(dateKey) ||
+                        availability.pending.includes(dateKey);
+                    isAvailableToday = !isUnavailable;
+                    availableTodayCache.set(profile.uid, isAvailableToday);
+                }
+                if (!isAvailableToday) continue;
+            }
+
+            filteredProfiles.push(profile);
+        }
+
+        profiles = filteredProfiles;
         return profiles;
     }
 

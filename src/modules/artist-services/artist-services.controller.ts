@@ -118,6 +118,8 @@ export async function createService(req: AuthRequest, res: Response): Promise<vo
             duration: body.duration ?? '',
             features: parsedFeatures,
             imageUrl,
+            contractId: body.contractId,
+            technicalRiderId: body.technicalRiderId,
         });
         sendCreated(res, created, 'Artist service created');
     } catch (err) {

@@ -163,6 +163,7 @@ Solo usuarios con rol **artista** pueden acceder. Cada artista gestiona sus prop
 
 ### `GET /artist-services`
 Lista los servicios del artista autenticado.
+Incluye los IDs (`contractId`, `technicalRiderId`) y también los objetos hijos (`contract`, `technicalRider`) cuando existen.
 
 **Response 200**
 ```json
@@ -193,10 +194,17 @@ Crea un nuevo servicio.
 {
   "name": "Concierto",
   "price": 500,
-  "description": "Show en vivo con banda completa"
+  "description": "Show en vivo con banda completa",
+  "contractId": "fileContract123",
+  "technicalRiderId": "fileRider123"
 }
 ```
-`name` y `price` son obligatorios. `description` es opcional.
+`name`, `price`, `contractId` y `technicalRiderId` son obligatorios.
+Validaciones:
+- ambos archivos deben existir
+- `contractId` debe ser tipo `contract`
+- `technicalRiderId` debe ser tipo `technical_rider`
+- ambos deben pertenecer al artista autenticado
 
 **Response 201**
 ```json
@@ -208,7 +216,9 @@ Crea un nuevo servicio.
 ```
 
 ### `PUT /artist-services/:id`
-Actualiza un servicio (solo si pertenece al artista). Campos opcionales: `name`, `price`, `description`.
+Actualiza un servicio (solo si pertenece al artista). Campos opcionales: `name`, `price`, `description`, `duration`, `features`, `contractId`, `technicalRiderId`.
+
+Si envías `contractId` o `technicalRiderId`, el backend valida existencia, tipo correcto y ownership.
 
 **Body** (todos opcionales)
 ```json
@@ -221,6 +231,53 @@ Actualiza un servicio (solo si pertenece al artista). Campos opcionales: `name`,
 
 ### `DELETE /artist-services/:id`
 Elimina un servicio (solo si pertenece al artista).
+
+---
+
+## Artist Files (Contracts & Technical Riders) 🔒
+
+Colección Firestore: `artist_files` (tabla única para ambos tipos).
+
+Todos los registros guardan:
+- `id`
+- `artistId`
+- `type` (`contract` | `technical_rider`)
+- `originalName`
+- `fileName`
+- `mimeType`
+- `size`
+- `storagePath`
+- `url`
+- `createdAt`
+- `updatedAt`
+
+### `GET /artist-files?type=contract|technical_rider`
+Lista archivos del artista autenticado. El filtro `type` es opcional.
+
+### `POST /artist-files`
+Sube un archivo del artista.
+
+**Content-Type**: `multipart/form-data`
+
+Campos:
+- `file` (obligatorio, PDF, max 10MB)
+- `type` (obligatorio: `contract` o `technical_rider`)
+
+El archivo se guarda en:
+`artists/{artistId}/files/{type}/{generatedFileName}`
+
+### `PUT /artist-files/:id`
+Reemplaza el archivo físico de un registro existente:
+1) sube el nuevo archivo  
+2) actualiza metadata del registro  
+3) elimina del Storage el archivo anterior (`storagePath` viejo)
+
+### `DELETE /artist-files/:id`
+Elimina archivo físico + registro en Firestore.
+
+Además desancla en `artist_services`:
+- si era tipo `contract`: elimina `contractId` en servicios que lo referencian
+- si era tipo `technical_rider`: elimina `technicalRiderId` en servicios que lo referencian
 
 ---
 

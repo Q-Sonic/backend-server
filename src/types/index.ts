@@ -94,6 +94,10 @@ export interface ArtistServiceRecord {
     technicalRiderId?: string;
     /** Linked contract ID for this specific service */
     contractId?: string;
+    /** Resolved contract file details */
+    contract?: ArtistFileRecord | null;
+    /** Resolved technical rider file details */
+    technicalRider?: ArtistFileRecord | null;
     /** Cover image URL for service card/modal */
     imageUrl?: string;
     createdAt: FirebaseFirestore.Timestamp;
@@ -123,6 +127,22 @@ export interface CreateArtistServiceInput {
 }
 
 export type UpdateArtistServiceInput = Partial<CreateArtistServiceInput>;
+
+export type ArtistFileType = 'contract' | 'technical_rider';
+
+export interface ArtistFileRecord {
+    id: string;
+    artistId: string;
+    type: ArtistFileType;
+    originalName: string;
+    fileName: string;
+    mimeType: string;
+    size: number;
+    storagePath: string;
+    url: string;
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+}
 
 // ─── Perfil de cliente (US-6, US-7) ───────────────────────────────────────────
 export interface ClientProfileRecord {

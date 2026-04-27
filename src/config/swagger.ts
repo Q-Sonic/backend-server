@@ -150,6 +150,48 @@ const options: swaggerJsdoc.Options = {
                         nextEvent: { $ref: '#/components/schemas/ContractRecord' }
                     },
                 },
+                ArtistFileRecord: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', example: 'fileId123' },
+                        artistId: { type: 'string', example: 'artistUid123' },
+                        type: { type: 'string', enum: ['contract', 'technical_rider'], example: 'contract' },
+                        originalName: { type: 'string', example: 'Contrato General.pdf' },
+                        fileName: { type: 'string', example: '1714263200000_Contrato_General.pdf' },
+                        mimeType: { type: 'string', example: 'application/pdf' },
+                        size: { type: 'number', example: 245120 },
+                        storagePath: {
+                            type: 'string',
+                            example: 'artists/artistUid123/files/contract/1714263200000_Contrato_General.pdf',
+                        },
+                        url: { type: 'string', example: 'https://storage.googleapis.com/...' },
+                        createdAt: { type: 'object', description: 'Firestore Timestamp' },
+                        updatedAt: { type: 'object', description: 'Firestore Timestamp' },
+                    },
+                },
+                ArtistServiceRecord: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', example: 'serviceId123' },
+                        artistId: { type: 'string', example: 'artistUid123' },
+                        name: { type: 'string', example: 'Show Acustico' },
+                        price: { type: 'number', example: 500 },
+                        description: { type: 'string', example: 'Presentacion de 60 minutos.' },
+                        duration: { type: 'string', example: '60 min' },
+                        features: { type: 'array', items: { type: 'string' } },
+                        imageUrl: { type: 'string', example: 'https://storage.googleapis.com/...' },
+                        contractId: { type: 'string', example: 'fileContract123' },
+                        technicalRiderId: { type: 'string', example: 'fileRider123' },
+                        contract: {
+                            anyOf: [{ $ref: '#/components/schemas/ArtistFileRecord' }, { type: 'null' }],
+                        },
+                        technicalRider: {
+                            anyOf: [{ $ref: '#/components/schemas/ArtistFileRecord' }, { type: 'null' }],
+                        },
+                        createdAt: { type: 'object', description: 'Firestore Timestamp' },
+                        updatedAt: { type: 'object', description: 'Firestore Timestamp' },
+                    },
+                },
                 ContractRecord: {
                     type: 'object',
                     properties: {
@@ -201,6 +243,8 @@ const options: swaggerJsdoc.Options = {
             { name: 'Health', description: 'Estado del servidor' },
             { name: 'Auth', description: 'Registro y perfil de usuario' },
             { name: 'Artist Profile', description: 'Perfil público del artista (US-10)' },
+            { name: 'Artist Services', description: 'Servicios del artista' },
+            { name: 'Artist Files', description: 'Archivos del artista (contract y technical rider)' },
             { name: 'Dashboard', description: 'Estadísticas y balance del artista' },
             { name: 'Events', description: 'Gestión de calendario y shows' },
             { name: 'Contracts', description: 'Gestión de contratos y pagos' },

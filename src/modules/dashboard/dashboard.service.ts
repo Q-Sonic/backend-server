@@ -85,17 +85,24 @@ export class DashboardService {
             .where('status', 'in', [ContractStatus.PENDING, ContractStatus.ACCEPTED, ContractStatus.COMPLETED])
             .get();
 
+        let totalEvents = 0;
         let eventsThisMonth = 0;
         let eventsLastMonth = 0;
         for (const doc of contractsSnapshot.docs) {
             const contract = { id: doc.id, ...doc.data() } as ContractRecord;
             const eventDate = contractEventDate(contract);
+            
+            // Increment total count for Accepted/Completed
+            if (contract.status === ContractStatus.ACCEPTED || contract.status === ContractStatus.COMPLETED) {
+                totalEvents += 1;
+            }
+
             if (!eventDate) continue;
             if (isDateInCalendarMonth(eventDate, y, m)) eventsThisMonth += 1;
             else if (isDateInCalendarMonth(eventDate, lastMonthY, lastMonthM)) eventsLastMonth += 1;
         }
 
-        const totalEventsCurr = eventsThisMonth;
+        const totalEventsCurr = totalEvents;
         const eventsGrowthPercent =
             eventsLastMonth === 0
                 ? eventsThisMonth > 0
@@ -108,7 +115,7 @@ export class DashboardService {
         const profileData = profileDoc.exists ? (profileDoc.data() as any) : null;
 
         const totalBalance = numberFromUnknown(
-            profileData?.totalBalance ?? profileData?.balance ?? profileData?.walletBalance,
+            profileData?.totalBalance ?? profileData?.walletBalance ?? profileData?.balance,
             0,
         );
         const profileVisitsTotal = numberFromUnknown(profileData?.totalVisits ?? profileData?.visits, 0);
@@ -126,7 +133,11 @@ export class DashboardService {
             .map(doc => ({ id: doc.id, ...doc.data() } as ContractRecord))
             .filter(contract => {
                 const eventDate = contractEventDate(contract);
-                return !!eventDate && eventDate.getTime() >= nowMillis;
+                return (
+                    !!eventDate && 
+                    eventDate.getTime() >= nowMillis && 
+                    contract.status === ContractStatus.ACCEPTED
+                );
             })
             .sort((a, b) => {
                 const at = contractEventDate(a)?.getTime() || 0;

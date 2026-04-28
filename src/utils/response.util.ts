@@ -15,14 +15,23 @@ export const sendError = (
     {
         res,
         error,
-        statusCode
+        statusCode,
+        code,
+        details
     }: {
         res: Response,
         error: string,
-        statusCode: number
+        statusCode: number,
+        code?: string,
+        details?: any
     }
 ): Response => {
-    const body: ApiResponse = { success: false, error };
+    const body: ApiResponse = { 
+        success: false, 
+        error: error || 'An unexpected error occurred',
+        ...(code ? { code } : {}),
+        ...(details ? { data: details } : {})
+    };
     return res.status(statusCode).json(body);
 };
 

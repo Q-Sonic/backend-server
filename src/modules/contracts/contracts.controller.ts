@@ -35,14 +35,19 @@ export class ContractsController {
     async create(req: AuthRequest, res: Response) {
         if (!req.user) return sendError({ res, error: 'Unauthorized', statusCode: 401 });
 
-        // Simple validation
         const { artistId, serviceId, eventDetails, totalAmount } = req.body;
         if (!artistId || !serviceId || !eventDetails || !totalAmount) {
             return sendError({ res, error: 'Missing required fields', statusCode: 400 });
         }
 
         try {
-            const contract = await contractsService.create(req.user.uid, req.body);
+            // Pasamos solo los campos necesarios explícitamente para evitar Mass Assignment
+            const contract = await contractsService.create(req.user.uid, {
+                artistId,
+                serviceId,
+                eventDetails,
+                totalAmount
+            });
             sendSuccess(res, contract, 'Contract created successfully', 201);
         } catch (error: any) {
             sendError({ res, error: error.message, statusCode: 500 });
@@ -87,6 +92,18 @@ export class ContractsController {
         try {
             const results = await contractsService.bulkSignAccepted(req.user.uid);
             sendSuccess(res, results, 'All pending contracts signed successfully');
+        } catch (error: any) {
+            sendError({ res, error: error.message, statusCode: 500 });
+        }
+    }
+
+    async getBookedDates(req: AuthRequest, res: Response) {
+        try {
+            const { artistId } = req.params;
+            if (!artistId) return sendError({ res, error: 'Artist ID is required', statusCode: 400 });
+            
+            const dates = await contractsService.getBookedDates(artistId as string);
+            sendSuccess(res, dates, 'Booked dates retrieved successfully');
         } catch (error: any) {
             sendError({ res, error: error.message, statusCode: 500 });
         }

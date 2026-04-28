@@ -20,10 +20,10 @@ export class EventsService {
         this.storageService = new StorageService();
         this.usersService = new UsersService();
     }
-
     async getCalendarEvents(artistUid: string, startDate?: Date, endDate?: Date): Promise<ContractRecord[]> {
         let query = this.db.collection(CONTRACTS_COLLECTION)
-            .where('artistId', '==', artistUid);
+            .where('artistId', '==', artistUid)
+            .where('status', 'in', [ContractStatus.ACCEPTED, ContractStatus.COMPLETED]);
 
         // Filter by date if provided
         if (startDate) {
@@ -44,7 +44,8 @@ export class EventsService {
 
     async getClientCalendarEvents(clientUid: string, startDate?: Date, endDate?: Date): Promise<ContractRecord[]> {
         let query = this.db.collection(CONTRACTS_COLLECTION)
-            .where('clientId', '==', clientUid);
+            .where('clientId', '==', clientUid)
+            .where('status', 'in', [ContractStatus.ACCEPTED, ContractStatus.COMPLETED]);
 
         if (startDate) {
             query = query.where('eventDetails.date', '>=', admin.firestore.Timestamp.fromDate(startDate));

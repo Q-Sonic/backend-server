@@ -98,78 +98,84 @@ export class ContractsService {
     }
 
     async updateStatus(id: string, userId: string, status: ContractStatus): Promise<ContractRecord> {
-        const ref = this.db.collection(COLLECTION).doc(id);
-        const doc = await ref.get();
-        if (!doc.exists) throw new Error('Contract not found');
-        const data = doc.data() as ContractRecord;
+        const result = await this.db.runTransaction(async (transaction) => {
+            const ref = this.db.collection(COLLECTION).doc(id);
+            const doc = await transaction.get(ref);
+            if (!doc.exists) throw new Error('Contract not found');
+            const data = doc.data() as ContractRecord;
 
-        if (status === ContractStatus.CANCELLED) {
-            if (data.clientId !== userId) throw new Error('Unauthorized to cancel this contract');
-        } else {
-            if (data.artistId !== userId) throw new Error('Only the artist can change the status');
-        }
+            if (status === ContractStatus.CANCELLED) {
+                if (data.clientId !== userId) throw new Error('Unauthorized to cancel this contract');
+            } else {
+                if (data.artistId !== userId) throw new Error('Only the artist can change the status');
+            }
 
-        const updateData: any = { status, updatedAt: admin.firestore.Timestamp.now() };
+            // Evitar re-procesar si ya está en el estado deseado
+            if (data.status === status) return { ...data, id } as ContractRecord;
 
-        // --- Generate PDF only when ACCEPTED ---
-        if (status === ContractStatus.ACCEPTED && !data.contractUrl) {
-            try {
-                const artist = await this.usersService.findById(data.artistId);
-                const client = await this.usersService.findById(data.clientId);
-                
-                const { id: _, ...rest } = data;
-                const pdfBuffer = await this.pdfService.generateContractPdf(
-                    { id, ...rest } as ContractRecord, 
-                    artist as UserRecord, 
-                    client as UserRecord
-                );
-                
-                const fileName = `contract_${id}.pdf`;
-                const contractUrl = await this.storageService.uploadFile(
-                    pdfBuffer,
-                    fileName,
-                    'application/pdf',
-                    `contracts/${id}`
-                );
-                
-                updateData.contractUrl = contractUrl;
+            const updateData: any = { status, updatedAt: admin.firestore.Timestamp.now() };
 
-                // --- Send Notifications ---
-                const serviceDoc = await this.db.collection('artist_services').doc(data.serviceId).get();
-                const serviceName = serviceDoc.data()?.name || 'Servicio Musical';
-
-                const details = {
-                    contractId: id,
-                    serviceName,
-                    eventName: data.eventDetails.name,
-                    artistName: artist?.displayName || 'Artista',
-                    clientName: client?.displayName || 'Cliente'
-                };
-
-                // Notification to Artist
-                if (artist?.email) {
-                    await sendContractSignedNotification(artist.email, 'artist', details);
-                }
-
-                // Notification to Client
-                if (client?.email) {
-                    await sendContractSignedNotification(client.email, 'client', details);
-                }
-
-                // --- Increment totalHires ---
-                await this.db.collection('artist_profiles').doc(data.artistId).update({
+            // Si es aceptado, incrementamos contador de contrataciones
+            if (status === ContractStatus.ACCEPTED && data.status !== ContractStatus.ACCEPTED) {
+                const profileRef = this.db.collection('artist_profiles').doc(data.artistId);
+                transaction.update(profileRef, {
                     totalHires: admin.firestore.FieldValue.increment(1)
                 });
-
-            } catch (pdfErr) {
-                console.error('Failed to generate PDF or send notifications:', pdfErr);
             }
+
+            transaction.update(ref, updateData);
+            return { ...data, ...updateData, id } as ContractRecord;
+        });
+
+        // Efectos secundarios asíncronos (No bloquean la respuesta inmediata pero se ejecutan tras el commit)
+        if (status === ContractStatus.ACCEPTED && !result.contractUrl) {
+            void this.processPostAcceptance(id, result);
         }
 
-        await ref.update(updateData);
-        Logger.info(`Contract ${id} status changed: ${data.status} -> ${status}`);
-        const updated = await ref.get();
-        return { id: updated.id, ...updated.data() } as ContractRecord;
+        Logger.info(`Contract ${id} status changed to ${status}`);
+        return result;
+    }
+
+    private async processPostAcceptance(id: string, data: ContractRecord): Promise<void> {
+        try {
+            const artist = await this.usersService.findById(data.artistId);
+            const client = await this.usersService.findById(data.clientId);
+            
+            const pdfBuffer = await this.pdfService.generateContractPdf(
+                data, 
+                artist as UserRecord, 
+                client as UserRecord
+            );
+            
+            const fileName = `contract_${id}.pdf`;
+            const contractUrl = await this.storageService.uploadFile(
+                pdfBuffer,
+                fileName,
+                'application/pdf',
+                `contracts/${id}`
+            );
+            
+            await this.db.collection(COLLECTION).doc(id).update({ contractUrl });
+
+            // Notificaciones
+            const serviceDoc = await this.db.collection('artist_services').doc(data.serviceId).get();
+            const serviceName = serviceDoc.data()?.name || 'Servicio Musical';
+
+            const details = {
+                contractId: id,
+                serviceName,
+                eventName: data.eventDetails.name,
+                artistName: artist?.displayName || 'Artista',
+                clientName: client?.displayName || 'Cliente'
+            };
+
+            if (artist?.email) await sendContractSignedNotification(artist.email, 'artist', details);
+            if (client?.email) await sendContractSignedNotification(client.email, 'client', details);
+
+            Logger.success(`Post-acceptance processing complete for contract ${id}`);
+        } catch (err) {
+            Logger.error(`Error in post-acceptance for contract ${id}:`, err);
+        }
     }
 
     async bulkSignAccepted(artistId: string): Promise<{ successCount: number; errors: string[] }> {
@@ -187,12 +193,12 @@ export class ContractsService {
 
         for (const doc of pendingSnapshot.docs) {
             try {
-                // Here we would ideally check if terms are accepted in the doc data
-                // For now, mirroring single updateStatus logic
+                // Cada actualización ahora es atómica por sí misma
                 await this.updateStatus(doc.id, artistId, ContractStatus.ACCEPTED);
                 successCount++;
             } catch (err: any) {
                 errors.push(`Error en contrato ${doc.id}: ${err.message}`);
+                Logger.error(`Bulk sign error for contract ${doc.id}:`, err);
             }
         }
 
@@ -261,5 +267,33 @@ export class ContractsService {
         });
 
         return result;
+    }
+
+    /**
+     * Returns an array of date strings (YYYY-MM-DD) that are already booked (Accepted/Completed)
+     */
+    async getBookedDates(artistId: string): Promise<string[]> {
+        const snapshot = await this.db.collection(COLLECTION)
+            .where('artistId', '==', artistId)
+            .where('status', 'in', [ContractStatus.ACCEPTED, ContractStatus.COMPLETED])
+            .get();
+
+        const dates = snapshot.docs.map(doc => {
+            const data = doc.data() as ContractRecord;
+            const eventDate = data.eventDetails.date;
+            let dateStr = '';
+            
+            if (eventDate instanceof admin.firestore.Timestamp) {
+                dateStr = eventDate.toDate().toISOString();
+            } else if (typeof eventDate === 'string') {
+                dateStr = eventDate;
+            } else if (eventDate && typeof eventDate === 'object' && '_seconds' in eventDate) {
+                dateStr = new Date((eventDate as any)._seconds * 1000).toISOString();
+            }
+            
+            return dateStr.split('T')[0];
+        }).filter(d => !!d);
+
+        return [...new Set(dates)];
     }
 }

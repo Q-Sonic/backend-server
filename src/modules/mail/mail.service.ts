@@ -51,14 +51,19 @@ export async function sendAccountChangeVerificationCode(to: string, code: string
 <p style="font-size:1.5rem;letter-spacing:0.25em;font-weight:bold;">${escapeHtml(code)}</p>
 <p>Caduca en ${ttl} minutos. Si no lo solicitaste, ignora este correo.</p>`;
 
-    await tx.sendMail({
-        from: fromAddr.includes('<') || fromAddr.includes('@') ? fromAddr : `Q-Sonic <${fromAddr}>`,
-        to,
-        subject,
-        text,
-        html,
-    });
-    Logger.info(`Account change code email sent to ${to}`);
+    try {
+        await tx.sendMail({
+            from: fromAddr.includes('<') || fromAddr.includes('@') ? fromAddr : `StageGo <${fromAddr}>`,
+            to,
+            subject,
+            text,
+            html,
+        });
+        Logger.info(`Account change code email sent successfully to ${to}`);
+    } catch (error) {
+        Logger.error(`Failed to send account change code email to ${to}:`, error);
+        throw error;
+    }
 }
 
 export async function sendWithdrawalRequestNotification(
@@ -88,13 +93,18 @@ export async function sendWithdrawalRequestNotification(
         <p>Por favor, procesa este pago y marca la solicitud como completada en el panel administrativo.</p>
     `;
 
-    await tx.sendMail({
-        from: `Q-Sonic Billing <${env.SMTP_USER}>`,
-        to: adminEmail,
-        subject,
-        html,
-    });
-    Logger.info(`Withdrawal notification sent to admin: ${adminEmail}`);
+    try {
+        await tx.sendMail({
+            from: `StageGo Billing <${env.SMTP_USER}>`,
+            to: adminEmail,
+            subject,
+            html,
+        });
+        Logger.info(`Withdrawal notification sent to admin: ${adminEmail}`);
+    } catch (error) {
+        Logger.error(`Failed to send withdrawal notification to admin (${adminEmail}):`, error);
+        // Do not throw here to avoid failing user request if only admin notification fails
+    }
 }
 
 export async function sendWelcomeEmail(to: string, displayName: string): Promise<void> {
@@ -114,13 +124,18 @@ export async function sendWelcomeEmail(to: string, displayName: string): Promise
         </div>
     `;
 
-    await tx.sendMail({
-        from: `StageGo <${env.SMTP_USER}>`,
-        to,
-        subject,
-        html,
-    });
-    Logger.info(`Welcome email sent to ${to}`);
+    try {
+        await tx.sendMail({
+            from: `StageGo <${env.SMTP_USER}>`,
+            to,
+            subject,
+            html,
+        });
+        Logger.info(`Welcome email sent to ${to}`);
+    } catch (error) {
+        Logger.error(`Failed to send welcome email to ${to}:`, error);
+        throw error;
+    }
 }
 
 export async function sendPasswordResetEmail(to: string, code: string, displayName: string): Promise<void> {
@@ -140,13 +155,18 @@ export async function sendPasswordResetEmail(to: string, code: string, displayNa
         </div>
     `;
 
-    await tx.sendMail({
-        from: `StageGo <${env.SMTP_USER}>`,
-        to,
-        subject,
-        html,
-    });
-    Logger.info(`Password reset email sent to ${to}`);
+    try {
+        await tx.sendMail({
+            from: `StageGo <${env.SMTP_USER}>`,
+            to,
+            subject,
+            html,
+        });
+        Logger.info(`Password reset email sent to ${to}`);
+    } catch (error) {
+        Logger.error(`Failed to send password reset email to ${to}:`, error);
+        throw error;
+    }
 }
 
 export async function sendContractSignedNotification(
@@ -176,13 +196,18 @@ export async function sendContractSignedNotification(
         </div>
     `;
 
-    await tx.sendMail({
-        from: `StageGo Contracts <${env.SMTP_USER}>`,
-        to,
-        subject,
-        html,
-    });
-    Logger.info(`Contract signed notification sent to ${role}: ${to}`);
+    try {
+        await tx.sendMail({
+            from: `StageGo Contracts <${env.SMTP_USER}>`,
+            to,
+            subject,
+            html,
+        });
+        Logger.info(`Contract signed notification sent to ${role}: ${to}`);
+    } catch (error) {
+        Logger.error(`Failed to send contract signed notification to ${role} (${to}):`, error);
+        // Optional: throw if critical
+    }
 }
 
 function escapeHtml(s: string): string {

@@ -517,6 +517,7 @@ export class AuthService {
    * Cambia la contraseña del usuario después de validar el código.
    */
   async resetPassword(email: string, code: string, newPassword: string): Promise<void> {
+    console.log('[AuthService] resetPassword request:', { email, code: '***' });
     const doc = await this.db.collection('passwordResets').doc(email).get();
 
     if (!doc.exists) {
@@ -527,10 +528,6 @@ export class AuthService {
 
     if (data.code !== code) {
       throw new Error('Código inválido');
-    }
-
-    if (!data.verified) {
-      throw new Error('El código no ha sido verificado');
     }
 
     if (data.expiresAt.toDate() < new Date()) {

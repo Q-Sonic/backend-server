@@ -155,4 +155,21 @@ router.post('/:id/payments', (req, res) => controller.addPayment(req, res));
  */
 router.post('/sign-all', roleGuard(UserRoleEnum.ARTISTA), (req, res) => controller.signAll(req, res));
 
+/**
+ * @swagger
+ * /contracts/booked-dates/{artistId}:
+ *   get:
+ *     summary: Obtener todas las fechas ya ocupadas (contratadas) de un artista
+ *     tags: [Contracts]
+ *     parameters:
+ *       - in: path
+ *         name: artistId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de fechas ocupadas (YYYY-MM-DD)
+ */
+router.get('/booked-dates/:artistId', (req, res) => controller.getBookedDates(req, res));
+
 export default router;

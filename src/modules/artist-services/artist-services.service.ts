@@ -134,6 +134,7 @@ export class ArtistServicesService {
             duration: (input.duration ?? '').trim(),
             features: input.features ?? [],
             imageUrl: (input.imageUrl ?? '').trim(),
+            isPinned: Boolean(input.isPinned),
             contractId: input.contractId,
             technicalRiderId: input.technicalRiderId,
             createdAt: now,
@@ -176,6 +177,7 @@ export class ArtistServicesService {
         if (input.duration !== undefined) updates.duration = input.duration.trim();
         if (input.features !== undefined) updates.features = input.features;
         if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl.trim();
+        if (input.isPinned !== undefined) updates.isPinned = Boolean(input.isPinned);
         if (input.contractId !== undefined) updates.contractId = input.contractId;
         if (input.technicalRiderId !== undefined) updates.technicalRiderId = input.technicalRiderId;
 

@@ -10,6 +10,14 @@ import { Logger } from '../../utils/logger.util';
 import { sendContractSignedNotification } from '../mail/mail.service';
 
 const COLLECTION = 'contracts';
+const ARTIST_FILES_COLLECTION = 'artist_files';
+const ARTIST_SIGNATURE_DEADLINE_DAYS = 3;
+
+type UpdateStatusOptions = {
+    artistSignatureDataUrl?: string;
+    acceptedTerms?: boolean;
+    rejectionReason?: string;
+};
 
 export class ContractsService {
     private db: admin.firestore.Firestore;
@@ -26,22 +34,72 @@ export class ContractsService {
         this.artistProfilesService = new ArtistProfilesService();
     }
 
+    private parseContractStatus(rawStatus: string | ContractStatus): ContractStatus {
+        const normalized = String(rawStatus || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, '_');
+        const allowed = Object.values(ContractStatus) as string[];
+        if (!allowed.includes(normalized)) {
+            throw new Error('Invalid contract status');
+        }
+        return normalized as ContractStatus;
+    }
+
+    private decodeSignatureDataUrl(dataUrl: string): { buffer: Buffer; mimeType: string; extension: string } {
+        const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+        if (!match) throw new Error('Invalid signature format');
+        const mimeType = match[1]!;
+        const base64 = match[2]!;
+        const buffer = Buffer.from(base64, 'base64');
+        if (!buffer.length) throw new Error('Empty signature');
+        const extension = mimeType.includes('png') ? 'png' : mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'img';
+        return { buffer, mimeType, extension };
+    }
+
+    private async uploadSignature(
+        contractId: string,
+        actor: 'client' | 'artist',
+        signatureDataUrl: string,
+    ): Promise<string> {
+        const { buffer, mimeType, extension } = this.decodeSignatureDataUrl(signatureDataUrl);
+        const fileName = `${actor}-signature.${extension}`;
+        return this.storageService.uploadFile(buffer, fileName, mimeType, `contracts/${contractId}/signatures`);
+    }
+
+    private async hydrateSignedSourceContract(record: ContractRecord): Promise<ContractRecord> {
+        const signedFileId = String(record.sourceContractFileId || '').trim();
+        if (!signedFileId || record.sourceContractUrl) return record;
+        const fileDoc = await this.db.collection(ARTIST_FILES_COLLECTION).doc(signedFileId).get();
+        if (!fileDoc.exists) return record;
+        const fileData = fileDoc.data() as { url?: string; originalName?: string };
+        return {
+            ...record,
+            sourceContractUrl: String(fileData.url || '').trim() || undefined,
+            sourceContractOriginalName: String(fileData.originalName || '').trim() || undefined,
+        };
+    }
+
     async findClientHistory(clientId: string): Promise<ContractRecord[]> {
         const snapshot = await this.db.collection(COLLECTION).where('clientId', '==', clientId).get();
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ContractRecord)).sort((a, b) => {
+        const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ContractRecord)).sort((a, b) => {
             const at = a.createdAt?.toMillis?.() ?? 0;
             const bt = b.createdAt?.toMillis?.() ?? 0;
             return bt - at;
         });
+        const hydrated = await Promise.all(rows.map((row) => this.hydrateSignedSourceContract(row)));
+        return hydrated;
     }
 
     async findArtistHistory(artistId: string): Promise<ContractRecord[]> {
         const snapshot = await this.db.collection(COLLECTION).where('artistId', '==', artistId).get();
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ContractRecord)).sort((a, b) => {
+        const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ContractRecord)).sort((a, b) => {
             const at = a.createdAt?.toMillis?.() ?? 0;
             const bt = b.createdAt?.toMillis?.() ?? 0;
             return bt - at;
         });
+        const hydrated = await Promise.all(rows.map((row) => this.hydrateSignedSourceContract(row)));
+        return hydrated;
     }
 
     async findById(id: string, userId: string): Promise<ContractRecord> {
@@ -58,6 +116,9 @@ export class ContractsService {
     async create(clientId: string, input: CreateContractInput): Promise<ContractRecord> {
         const now = admin.firestore.Timestamp.now();
         const eventDate = admin.firestore.Timestamp.fromDate(new Date(input.eventDetails.date));
+        if (!input.clientSignatureDataUrl || input.acceptedTerms !== true) {
+            throw new Error('Client signature and accepted terms are required');
+        }
 
         // Validation: Artist service MUST have a contract linked
         const serviceDoc = await this.db.collection('artist_services').doc(input.serviceId).get();
@@ -67,6 +128,19 @@ export class ContractsService {
         if (!serviceData?.contractId) {
             throw new Error('Este servicio no puede ser contratado porque el artista aún no ha vinculado un contrato legal al mismo.');
         }
+        const sourceContractFileId = String(serviceData?.contractId || '').trim();
+        let sourceContractUrl = String(
+            serviceData?.contractUrl || serviceData?.contractPdfUrl || serviceData?.documentUrl || '',
+        ).trim();
+        let sourceContractOriginalName: string | undefined;
+        if (sourceContractFileId) {
+            const signedContractFileDoc = await this.db.collection(ARTIST_FILES_COLLECTION).doc(sourceContractFileId).get();
+            if (signedContractFileDoc.exists) {
+                const signedContractFile = signedContractFileDoc.data() as { url?: string; originalName?: string };
+                sourceContractUrl = String(signedContractFile.url || sourceContractUrl || '').trim();
+                sourceContractOriginalName = String(signedContractFile.originalName || '').trim() || undefined;
+            }
+        }
 
         // Get artist rider if available
         let riderUrl: string | undefined;
@@ -75,11 +149,17 @@ export class ContractsService {
             riderUrl = artistProfile?.technicalRiderUrl;
         } catch { /* ignore if not found */ }
 
+        const ref = this.db.collection(COLLECTION).doc();
+        const clientSignatureUrl = await this.uploadSignature(ref.id, 'client', input.clientSignatureDataUrl);
+        const artistDecisionDeadlineAt = admin.firestore.Timestamp.fromMillis(
+            now.toMillis() + ARTIST_SIGNATURE_DEADLINE_DAYS * 24 * 60 * 60 * 1000,
+        );
+
         const record: Omit<ContractRecord, 'id'> = {
             clientId,
             artistId: input.artistId,
             serviceId: input.serviceId,
-            status: ContractStatus.PENDING,
+            status: ContractStatus.PENDING_ARTIST_SIGNATURE,
             eventDetails: { ...input.eventDetails, date: eventDate } as any,
             financials: {
                 totalAmount: Number(input.totalAmount),
@@ -87,17 +167,31 @@ export class ContractsService {
                 paymentStatus: PaymentStatus.UNPAID,
             },
             payments: [],
-            riderUrl, // Snapshotted rider
+            clientSignatureUrl,
+            clientAcceptedTerms: true,
+            clientSignedAt: now,
+            artistAcceptedTerms: false,
+            artistDecisionDeadlineAt,
+            ...(sourceContractFileId ? { sourceContractFileId } : {}),
+            ...(sourceContractUrl ? { sourceContractUrl } : {}),
+            ...(sourceContractOriginalName ? { sourceContractOriginalName } : {}),
+            ...(riderUrl ? { riderUrl } : {}), // Snapshotted rider only when present
             createdAt: now,
             updatedAt: now,
         };
 
-        const ref = await this.db.collection(COLLECTION).add(record);
+        await ref.set(record);
         Logger.success(`Contract created: ${ref.id} for artist ${input.artistId} ($${input.totalAmount})`);
         return { id: ref.id, ...record } as ContractRecord;
     }
 
-    async updateStatus(id: string, userId: string, status: ContractStatus): Promise<ContractRecord> {
+    async updateStatus(
+        id: string,
+        userId: string,
+        rawStatus: string | ContractStatus,
+        options: UpdateStatusOptions = {},
+    ): Promise<ContractRecord> {
+        const status = this.parseContractStatus(rawStatus);
         const ref = this.db.collection(COLLECTION).doc(id);
         const doc = await ref.get();
         if (!doc.exists) throw new Error('Contract not found');
@@ -112,27 +206,53 @@ export class ContractsService {
         const updateData: any = { status, updatedAt: admin.firestore.Timestamp.now() };
 
         // --- Generate PDF only when ACCEPTED ---
-        if (status === ContractStatus.ACCEPTED && !data.contractUrl) {
+        if (status === ContractStatus.ACCEPTED) {
+            if (data.status !== ContractStatus.PENDING_ARTIST_SIGNATURE && data.status !== ContractStatus.PENDING) {
+                throw new Error('Contract is not awaiting artist signature');
+            }
+            if (data.financials?.paymentStatus !== PaymentStatus.PAID) {
+                throw new Error('Contract payment is pending. The artist can sign only after full payment.');
+            }
+            if (!options.artistSignatureDataUrl || options.acceptedTerms !== true) {
+                throw new Error('Artist signature and accepted terms are required');
+            }
             try {
                 const artist = await this.usersService.findById(data.artistId);
                 const client = await this.usersService.findById(data.clientId);
+                const artistSignatureUrl = await this.uploadSignature(id, 'artist', options.artistSignatureDataUrl);
+                const signedAt = admin.firestore.Timestamp.now();
+                updateData.artistSignatureUrl = artistSignatureUrl;
+                updateData.artistAcceptedTerms = true;
+                updateData.artistSignedAt = signedAt;
                 
                 const { id: _, ...rest } = data;
-                const pdfBuffer = await this.pdfService.generateContractPdf(
-                    { id, ...rest } as ContractRecord, 
+                const finalContractPdf = await this.pdfService.generateContractPdf(
+                    { id, ...rest, ...updateData } as ContractRecord,
                     artist as UserRecord, 
                     client as UserRecord
                 );
+                const signatureReceiptPdf = await this.pdfService.generateSignatureReceiptPdf(
+                    { id, ...rest, ...updateData } as ContractRecord,
+                    artist as UserRecord,
+                    client as UserRecord,
+                );
                 
-                const fileName = `contract_${id}.pdf`;
+                const fileName = `stagego-signed-contract_${id}.pdf`;
                 const contractUrl = await this.storageService.uploadFile(
-                    pdfBuffer,
+                    finalContractPdf,
                     fileName,
                     'application/pdf',
                     `contracts/${id}`
                 );
+                const signatureReceiptUrl = await this.storageService.uploadFile(
+                    signatureReceiptPdf,
+                    `stagego-signature-receipt_${id}.pdf`,
+                    'application/pdf',
+                    `contracts/${id}`,
+                );
                 
                 updateData.contractUrl = contractUrl;
+                updateData.signatureReceiptUrl = signatureReceiptUrl;
 
                 // --- Send Notifications ---
                 const serviceDoc = await this.db.collection('artist_services').doc(data.serviceId).get();
@@ -140,6 +260,7 @@ export class ContractsService {
 
                 const details = {
                     contractId: id,
+                    contractUrl,
                     serviceName,
                     eventName: data.eventDetails.name,
                     artistName: artist?.displayName || 'Artista',
@@ -163,7 +284,17 @@ export class ContractsService {
 
             } catch (pdfErr) {
                 console.error('Failed to generate PDF or send notifications:', pdfErr);
+                throw new Error('Failed to complete artist acceptance workflow');
             }
+        }
+
+        if (status === ContractStatus.REJECTED) {
+            if (data.status !== ContractStatus.PENDING_ARTIST_SIGNATURE && data.status !== ContractStatus.PENDING) {
+                throw new Error('Contract cannot be rejected in current status');
+            }
+            const reason = String(options.rejectionReason || '').trim();
+            if (reason) updateData.artistRejectionReason = reason;
+            updateData.artistAcceptedTerms = false;
         }
 
         await ref.update(updateData);
@@ -173,30 +304,10 @@ export class ContractsService {
     }
 
     async bulkSignAccepted(artistId: string): Promise<{ successCount: number; errors: string[] }> {
-        const pendingSnapshot = await this.db.collection(COLLECTION)
-            .where('artistId', '==', artistId)
-            .where('status', '==', ContractStatus.PENDING)
-            .get();
-
-        if (pendingSnapshot.empty) {
-            return { successCount: 0, errors: ['No hay contratos pendientes para firmar'] };
-        }
-
-        let successCount = 0;
-        const errors: string[] = [];
-
-        for (const doc of pendingSnapshot.docs) {
-            try {
-                // Here we would ideally check if terms are accepted in the doc data
-                // For now, mirroring single updateStatus logic
-                await this.updateStatus(doc.id, artistId, ContractStatus.ACCEPTED);
-                successCount++;
-            } catch (err: any) {
-                errors.push(`Error en contrato ${doc.id}: ${err.message}`);
-            }
-        }
-
-        return { successCount, errors };
+        return {
+            successCount: 0,
+            errors: ['Bulk auto-sign disabled for legal compliance: artist signature is required per contract'],
+        };
     }
 
     async addPayment(id: string, userId: string, input: AddPaymentInput): Promise<ContractRecord> {

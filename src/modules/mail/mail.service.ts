@@ -152,7 +152,14 @@ export async function sendPasswordResetEmail(to: string, code: string, displayNa
 export async function sendContractSignedNotification(
     to: string, 
     role: 'artist' | 'client',
-    details: { contractId: string; serviceName: string; eventName: string; artistName: string; clientName: string }
+    details: {
+        contractId: string;
+        contractUrl?: string;
+        serviceName: string;
+        eventName: string;
+        artistName: string;
+        clientName: string;
+    }
 ): Promise<void> {
     const env = getEnv();
     const tx = getTransporter();
@@ -171,6 +178,11 @@ export async function sendContractSignedNotification(
                 <p style="margin: 0;"><strong>ID Contrato:</strong> ${details.contractId}</p>
             </div>
             <p>Ya podés acceder a la plataforma para descargar el contrato en PDF y coordinar los detalles finales.</p>
+            ${
+                details.contractUrl
+                    ? `<p><a href="${escapeHtml(details.contractUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#00CCCB;color:#002B2A;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:700;">Descargar contrato firmado</a></p>`
+                    : ''
+            }
             <br/>
             <p>Gracias por confiar en <strong>StageGo</strong>.</p>
         </div>

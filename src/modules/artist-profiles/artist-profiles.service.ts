@@ -220,7 +220,12 @@ export class ArtistProfilesService {
         // Query all contracts for this artist
         const contractsSnapshot = await this.db.collection('contracts')
             .where('artistId', '==', uid)
-            .where('status', 'in', [ContractStatus.ACCEPTED, ContractStatus.PENDING, ContractStatus.COMPLETED])
+            .where('status', 'in', [
+                ContractStatus.ACCEPTED,
+                ContractStatus.PENDING,
+                ContractStatus.PENDING_ARTIST_SIGNATURE,
+                ContractStatus.COMPLETED,
+            ])
             .get();
 
         contractsSnapshot.docs.forEach(doc => {
@@ -230,7 +235,7 @@ export class ArtistProfilesService {
 
             if (data.status === ContractStatus.ACCEPTED || data.status === ContractStatus.COMPLETED) {
                 availability.reserved.push(dateStr);
-            } else if (data.status === ContractStatus.PENDING) {
+            } else if (data.status === ContractStatus.PENDING || data.status === ContractStatus.PENDING_ARTIST_SIGNATURE) {
                 availability.pending.push(dateStr);
             }
         });

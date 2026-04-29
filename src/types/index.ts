@@ -100,6 +100,8 @@ export interface ArtistServiceRecord {
     technicalRider?: ArtistFileRecord | null;
     /** Cover image URL for service card/modal */
     imageUrl?: string;
+    /** Whether the artist pinned this service to appear first on profile. */
+    isPinned?: boolean;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -122,6 +124,7 @@ export interface CreateArtistServiceInput {
     duration?: string;
     features?: string[];
     imageUrl?: string;
+    isPinned?: boolean;
     contractId?: string;
     technicalRiderId?: string;
 }

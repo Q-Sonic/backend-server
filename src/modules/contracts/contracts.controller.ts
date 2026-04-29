@@ -36,9 +36,16 @@ export class ContractsController {
         if (!req.user) return sendError({ res, error: 'Unauthorized', statusCode: 401 });
 
         // Simple validation
-        const { artistId, serviceId, eventDetails, totalAmount } = req.body;
+        const { artistId, serviceId, eventDetails, totalAmount, clientSignatureDataUrl, acceptedTerms } = req.body;
         if (!artistId || !serviceId || !eventDetails || !totalAmount) {
             return sendError({ res, error: 'Missing required fields', statusCode: 400 });
+        }
+        if (!clientSignatureDataUrl || acceptedTerms !== true) {
+            return sendError({
+                res,
+                error: 'Client signature and accepted terms are required',
+                statusCode: 400,
+            });
         }
 
         try {
@@ -53,12 +60,16 @@ export class ContractsController {
         if (!req.user) return sendError({ res, error: 'Unauthorized', statusCode: 401 });
 
         const { id } = req.params;
-        const { status } = req.body;
+        const { status, artistSignatureDataUrl, acceptedTerms, rejectionReason } = req.body;
 
         if (!status) return sendError({ res, error: 'Status is required', statusCode: 400 });
 
         try {
-            const contract = await contractsService.updateStatus(id as string, req.user.uid, status);
+            const contract = await contractsService.updateStatus(id as string, req.user.uid, status, {
+                artistSignatureDataUrl,
+                acceptedTerms,
+                rejectionReason,
+            });
             sendSuccess(res, contract, `Contract status updated to ${status}`);
         } catch (error: any) {
             sendError({ res, error: error.message, statusCode: 403 });

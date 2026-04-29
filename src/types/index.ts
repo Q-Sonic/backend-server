@@ -298,8 +298,27 @@ export interface ContractRecord {
     payments: PaymentItem[];
     /** PDF Contract URL */
     contractUrl?: string;
+    /** Signed evidence receipt PDF URL */
+    signatureReceiptUrl?: string;
+    /** Original contract template URL uploaded by the artist */
+    sourceContractUrl?: string;
+    /** Snapshot of artist contract file used at signing time */
+    sourceContractFileId?: string;
+    sourceContractOriginalName?: string;
     /** Captured Rider URL at booking time */
     riderUrl?: string;
+    /** Client legal evidence */
+    clientSignatureUrl?: string;
+    clientAcceptedTerms?: boolean;
+    clientSignedAt?: FirebaseFirestore.Timestamp;
+    /** Artist legal evidence */
+    artistSignatureUrl?: string;
+    artistAcceptedTerms?: boolean;
+    artistSignedAt?: FirebaseFirestore.Timestamp;
+    /** Deadline for artist decision */
+    artistDecisionDeadlineAt?: FirebaseFirestore.Timestamp;
+    /** Optional rejection reason from artist */
+    artistRejectionReason?: string;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -326,6 +345,8 @@ export interface CreateContractInput {
         description?: string;
     };
     totalAmount: number;
+    clientSignatureDataUrl?: string;
+    acceptedTerms?: boolean;
 }
 
 export interface AddPaymentInput {

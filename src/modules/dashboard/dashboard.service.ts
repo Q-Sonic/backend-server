@@ -90,7 +90,12 @@ export class DashboardService {
         const contractsSnapshot = await this.db
             .collection('contracts')
             .where('artistId', '==', artistUid)
-            .where('status', 'in', [ContractStatus.PENDING, ContractStatus.ACCEPTED, ContractStatus.COMPLETED])
+            .where('status', 'in', [
+                ContractStatus.PENDING,
+                ContractStatus.PENDING_ARTIST_SIGNATURE,
+                ContractStatus.ACCEPTED,
+                ContractStatus.COMPLETED,
+            ])
             .get();
 
         let eventsThisMonth = 0;
@@ -125,7 +130,12 @@ export class DashboardService {
         const upcomingSnapshot = await this.db
             .collection('contracts')
             .where('artistId', '==', artistUid)
-            .where('status', 'in', [ContractStatus.PENDING, ContractStatus.ACCEPTED, ContractStatus.COMPLETED])
+            .where('status', 'in', [
+                ContractStatus.PENDING,
+                ContractStatus.PENDING_ARTIST_SIGNATURE,
+                ContractStatus.ACCEPTED,
+                ContractStatus.COMPLETED,
+            ])
             .get();
         
         const nowMillis = now.getTime();

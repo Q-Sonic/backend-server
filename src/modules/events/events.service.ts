@@ -23,17 +23,24 @@ export class EventsService {
     async getCalendarEvents(artistUid: string, startDate?: Date, endDate?: Date): Promise<ContractRecord[]> {
         let query = this.db.collection(CONTRACTS_COLLECTION)
             .where('artistId', '==', artistUid)
-            .where('status', 'in', [ContractStatus.ACCEPTED, ContractStatus.COMPLETED]);
+            .where('status', 'in', [
+                ContractStatus.PENDING, 
+                ContractStatus.ACCEPTED, 
+                ContractStatus.COMPLETED
+            ]);
 
         // Filter by date if provided
         if (startDate) {
+            console.log('::::::: BACKEND getCalendarEvents applying startDate :::::::', startDate);
             query = query.where('eventDetails.date', '>=', admin.firestore.Timestamp.fromDate(startDate));
         }
         if (endDate) {
+            console.log('::::::: BACKEND getCalendarEvents applying endDate :::::::', endDate);
             query = query.where('eventDetails.date', '<=', admin.firestore.Timestamp.fromDate(endDate));
         }
 
         const snapshot = await query.get();
+        console.log('::::::: BACKEND getCalendarEvents results count :::::::', snapshot.size);
         return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ContractRecord))
             .sort((a, b) => {
                 const at = a.eventDetails?.date?.toMillis?.() || 0;
@@ -45,7 +52,7 @@ export class EventsService {
     async getClientCalendarEvents(clientUid: string, startDate?: Date, endDate?: Date): Promise<ContractRecord[]> {
         let query = this.db.collection(CONTRACTS_COLLECTION)
             .where('clientId', '==', clientUid)
-            .where('status', 'in', [ContractStatus.ACCEPTED, ContractStatus.COMPLETED]);
+            .where('status', 'in', [ContractStatus.PENDING, ContractStatus.ACCEPTED, ContractStatus.COMPLETED]);
 
         if (startDate) {
             query = query.where('eventDetails.date', '>=', admin.firestore.Timestamp.fromDate(startDate));

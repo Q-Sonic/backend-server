@@ -75,22 +75,23 @@ export class ContractsService {
             riderUrl = artistProfile?.technicalRiderUrl;
         } catch { /* ignore if not found */ }
 
-        const record: Omit<ContractRecord, 'id'> = {
+        const record: any = {
             clientId,
             artistId: input.artistId,
             serviceId: input.serviceId,
             status: ContractStatus.PENDING,
-            eventDetails: { ...input.eventDetails, date: eventDate } as any,
+            eventDetails: { ...input.eventDetails, date: eventDate },
             financials: {
                 totalAmount: Number(input.totalAmount),
                 paidAmount: 0,
                 paymentStatus: PaymentStatus.UNPAID,
             },
             payments: [],
-            riderUrl, // Snapshotted rider
             createdAt: now,
             updatedAt: now,
         };
+
+        if (riderUrl) record.riderUrl = riderUrl;
 
         const ref = await this.db.collection(COLLECTION).add(record);
         Logger.success(`Contract created: ${ref.id} for artist ${input.artistId} ($${input.totalAmount})`);

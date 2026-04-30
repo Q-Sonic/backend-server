@@ -38,15 +38,26 @@ export class PaymentsService {
         const token = this.generateAuthToken(NUVEI_LTP_SERVER_KEY, NUVEI_LTP_SERVER_SECRET, unixTimestamp);
 
         const requestBody = {
-            user: { id: payload.user_id, email: payload.user_email, name: "Cliente", last_name: "Q-Music" },
+            user: { 
+                id: payload.user_id, 
+                email: payload.user_email, 
+                name: "Cliente", 
+                last_name: "Q-Music" 
+            },
             order: { 
                 dev_reference: payload.dev_reference, 
                 description: payload.description, 
                 amount: payload.amount, 
+                vat: 0, 
+                tax_percentage: 0, 
+                taxable_amount: payload.amount, 
                 currency: "USD",
-                installments_type: 0 // Requerido: 0 para que no falle por cuotas
+                installments_type: 0
             },
             configuration: { 
+                partial_payment: false,
+                expiration_time: 36000,
+                allowed_payment_methods: ["All"],
                 success_url: `${FRONT_DNS}/payments/success`,
                 failure_url: `${FRONT_DNS}/payments/failure`,
                 pending_url: `${FRONT_DNS}/payments/pending`,
@@ -55,32 +66,38 @@ export class PaymentsService {
         };
 
         try {
-            const response = await axios.post(url, requestBody, { headers: { 'Auth-Token': token, 'Content-Type': 'application/json' } });
+            const response = await axios.post(url, requestBody, { 
+                headers: { 
+                    'Auth-Token': token, 
+                    'Content-Type': 'application/json' 
+                } 
+            });
             if (response.data?.success && response.data.data?.payment?.payment_url) {
                 return { id: response.data.data.order.id, payment_url: response.data.data.payment.payment_url };
             }
             throw new Error(response.data.error || 'Error Nuvei');
         } catch (error: any) {
-            throw new Error(error.response?.data?.error?.type || error.response?.data?.error || error.message);
+            const nuveiError = error.response?.data?.error;
+            Logger.error('[PaymentsService] Nuvei Error Detail:', JSON.stringify(nuveiError || error.message));
+            
+            if (nuveiError) {
+                throw new Error(`Nuvei: ${nuveiError.type || JSON.stringify(nuveiError)}`);
+            }
+            throw new Error(error.message);
         }
     }
 
     /**
      * Process a Nuvei (Paymentez) webhook callback.
-     * Updates artist balance if the transaction is successful.
      */
     static async processWebhook(body: any) {
         const { transaction, order } = body;
         
-        // Nuvei usually sends status: 'success' or status_detail: 3 (Authorized)
         if (body.status === 'success' || transaction?.status === 'success') {
             const db = getFirestore();
             const amount = transaction.amount;
-            const dev_reference = order.dev_reference; // This should be the artistId or serviceId
+            const dev_reference = order.dev_reference;
 
-            // For now, we expect dev_reference to contain enough info to find the artist
-            // Or we look up the order in our DB if we had saved it.
-            // TEMPORARY: Assuming dev_reference is the service ID, we find the artist through the service.
             const serviceSnap = await db.collection('artist_services').doc(dev_reference).get();
             if (serviceSnap.exists) {
                 const serviceData = serviceSnap.data();
@@ -91,19 +108,16 @@ export class PaymentsService {
                 }
             }
 
-            // If not a service, search in contracts
             const contractSnap = await db.collection('contracts').doc(dev_reference).get();
             if (contractSnap.exists) {
                 const contractData = contractSnap.data();
                 const artistId = contractData?.artistId;
                 if (artistId) {
-                    // Update contract payment status if needed (optional but recommended)
                     await this.updateArtistBalance(artistId, amount, `Pago por contrato: ${contractSnap.id}`);
                     return { success: true, message: 'Balance actualizado (Contrato)' };
                 }
             }
 
-            // Last resort: check if dev_reference is an artistId directly
             const artistSnap = await db.collection('artist_profiles').doc(dev_reference).get();
             if (artistSnap.exists) {
                 await this.updateArtistBalance(dev_reference, amount, `Pago directo o no identificado: ${order.description}`);
@@ -130,7 +144,6 @@ export class PaymentsService {
 
             t.set(artistRef, { totalBalance: newBalance }, { merge: true });
 
-            // Record transaction
             const txRef = db.collection('wallet_transactions').doc();
             t.set(txRef, {
                 artistId,
@@ -145,7 +158,6 @@ export class PaymentsService {
 
     /**
      * Request a withdrawal (payout).
-     * Deducts balance immediately and creates a PENDING request.
      */
     static async requestWithdraw(artistId: string, payload: { amount: number; bankDetails: any }) {
         const db = getFirestore();
@@ -175,7 +187,6 @@ export class PaymentsService {
 
             t.set(withdrawRef, withdrawData);
 
-            // Record transaction
             const txRef = db.collection('wallet_transactions').doc();
             t.set(txRef, {
                 artistId,
@@ -193,7 +204,6 @@ export class PaymentsService {
 
     /**
      * Update withdrawal status (Admin Only).
-     * Reverts balance if REJECTED.
      */
     static async updateWithdrawalStatus(adminId: string, requestId: string, status: WithdrawalStatus, reason?: string) {
         const db = getFirestore();
@@ -221,7 +231,6 @@ export class PaymentsService {
 
                 t.update(artistRef, { totalBalance: newBalance });
 
-                // Record reversal
                 const txRef = db.collection('wallet_transactions').doc();
                 t.set(txRef, {
                     artistId: data.artistId,
@@ -242,9 +251,11 @@ export class PaymentsService {
      * Generates Paymentez Auth Token.
      */
     private static generateAuthToken(serverKey: string, serverSecret: string, unixTimestamp: string): string {
-        const stringToHash = `${serverKey}${unixTimestamp}${serverSecret}`;
+        const stringToHash = `${serverSecret}${unixTimestamp}`;
         const sha256 = crypto.createHash('sha256').update(stringToHash).digest('hex');
-        return Buffer.from(`${serverKey};${unixTimestamp};${sha256}`).toString('base64');
+        
+        const authData = `${serverKey};${unixTimestamp};${sha256}`;
+        return Buffer.from(authData).toString('base64');
     }
 
     /**

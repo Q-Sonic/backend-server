@@ -25,7 +25,8 @@ export class ArtistServicesService {
         fileId: string,
         artistId: string,
         expectedType: ArtistFileType
-    ): Promise<ArtistFileRecord> {
+    ): Promise<ArtistFileRecord | null> {
+        if (!fileId) return null;
         const fileDoc = await this.db.collection(ARTIST_FILES_COLLECTION).doc(fileId).get();
         if (!fileDoc.exists) {
             throw new Error(`Referenced ${expectedType} file does not exist`);
@@ -116,14 +117,8 @@ export class ArtistServicesService {
     }
 
     async create(artistId: string, input: CreateArtistServiceInput): Promise<ArtistServiceRecord> {
-        if (!input.contractId) {
-            throw new Error('contractId is required');
-        }
-        if (!input.technicalRiderId) {
-            throw new Error('technicalRiderId is required');
-        }
-        await this.validateArtistFileOwnership(input.contractId, artistId, 'contract');
-        await this.validateArtistFileOwnership(input.technicalRiderId, artistId, 'technical_rider');
+        await this.validateArtistFileOwnership(input.contractId ?? '', artistId, 'contract');
+        await this.validateArtistFileOwnership(input.technicalRiderId ?? '', artistId, 'technical_rider');
 
         const now = admin.firestore.Timestamp.now();
         const record: Record<string, unknown> = {
@@ -135,8 +130,8 @@ export class ArtistServicesService {
             features: input.features ?? [],
             imageUrl: (input.imageUrl ?? '').trim(),
             isPinned: Boolean(input.isPinned),
-            contractId: input.contractId,
-            technicalRiderId: input.technicalRiderId,
+            contractId: input.contractId ?? undefined,
+            technicalRiderId: input.technicalRiderId ?? undefined,
             createdAt: now,
             updatedAt: now,
         };
@@ -159,12 +154,10 @@ export class ArtistServicesService {
         const data = doc.data() as { artistId: string };
         if (data.artistId !== artistId) throw new Error('Artist service not found');
 
-        if (input.contractId !== undefined) {
-            if (!input.contractId) throw new Error('contractId cannot be empty');
+        if (input.contractId !== undefined && input.contractId) {
             await this.validateArtistFileOwnership(input.contractId, artistId, 'contract');
         }
-        if (input.technicalRiderId !== undefined) {
-            if (!input.technicalRiderId) throw new Error('technicalRiderId cannot be empty');
+        if (input.technicalRiderId !== undefined && input.technicalRiderId) {
             await this.validateArtistFileOwnership(input.technicalRiderId, artistId, 'technical_rider');
         }
 
@@ -178,8 +171,12 @@ export class ArtistServicesService {
         if (input.features !== undefined) updates.features = input.features;
         if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl.trim();
         if (input.isPinned !== undefined) updates.isPinned = Boolean(input.isPinned);
-        if (input.contractId !== undefined) updates.contractId = input.contractId;
-        if (input.technicalRiderId !== undefined) updates.technicalRiderId = input.technicalRiderId;
+        if (input.contractId !== undefined) {
+            updates.contractId = input.contractId || admin.firestore.FieldValue.delete();
+        }
+        if (input.technicalRiderId !== undefined) {
+            updates.technicalRiderId = input.technicalRiderId || admin.firestore.FieldValue.delete();
+        }
 
         await ref.update(updates);
         await this.syncMinPrice(artistId);

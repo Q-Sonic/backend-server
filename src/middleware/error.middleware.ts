@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { sendError } from '../utils/response.util';
 import { Logger } from '../utils/logger.util';
+import { getEnv } from '../config/env';
 
 export function errorMiddleware(
     err: Error,
@@ -19,5 +20,8 @@ export function errorMiddleware(
     // Log the full stack error for debugging
     Logger.error(`❌ Global error caught at ${req.method} ${req.url}`, err);
 
-    sendError({ res, error: err.message || 'Internal Server Error', statusCode: 500 });
+    const isProduction = getEnv().NODE_ENV === 'production';
+    const message = isProduction ? 'Internal Server Error' : (err.message || 'Error desconocido');
+
+    sendError({ res, error: message, statusCode: 500 });
 }

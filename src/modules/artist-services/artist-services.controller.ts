@@ -22,6 +22,16 @@ function getArtistId(req: AuthRequest): string {
     return uid;
 }
 
+function parseOptionalBoolean(value: unknown): boolean | undefined {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+        const lowered = value.trim().toLowerCase();
+        if (lowered === 'true') return true;
+        if (lowered === 'false') return false;
+    }
+    return undefined;
+}
+
 export async function listMyServices(req: AuthRequest, res: Response): Promise<void> {
     try {
         const artistId = getArtistId(req);
@@ -118,7 +128,7 @@ export async function createService(req: AuthRequest, res: Response): Promise<vo
                 parsedFeatures = [];
             }
         }
-        
+
         if (!body.name || body.price == null) {
             sendError({ res, error: 'name and price are required', statusCode: 400 });
             return;
@@ -130,6 +140,9 @@ export async function createService(req: AuthRequest, res: Response): Promise<vo
             duration: body.duration ?? '',
             features: parsedFeatures,
             imageUrl,
+            isPinned: parseOptionalBoolean(body.isPinned),
+            contractId: body.contractId,
+            technicalRiderId: body.technicalRiderId,
         });
         sendCreated(res, created, 'Artist service created');
     } catch (err) {
@@ -151,6 +164,7 @@ export async function updateService(req: AuthRequest, res: Response): Promise<vo
         const serviceId = String(req.params.id);
         const file = req.file;
         const body = req.body as CreateArtistServiceInput;
+        const parsedIsPinned = parseOptionalBoolean(body.isPinned);
 
         let imageUrl: string | undefined;
         if (file) {
@@ -194,6 +208,7 @@ export async function updateService(req: AuthRequest, res: Response): Promise<vo
             {
                 ...req.body,
                 features: parsedFeatures,
+                ...(parsedIsPinned !== undefined ? { isPinned: parsedIsPinned } : {}),
                 ...(imageUrl ? { imageUrl } : {}),
             }
         );

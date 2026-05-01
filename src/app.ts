@@ -14,12 +14,19 @@ import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import eventsRoutes from './modules/events/events.routes';
 import artistSongsRoutes from './modules/artist-songs/artist-songs.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
+import landingLeadsRoutes from './modules/landing-leads/landing-leads.routes';
+import artistFilesRoutes from './modules/artist-files/artist-files.routes';
 import { errorMiddleware } from './middleware/error.middleware';
 import { sendSuccess } from './utils/response.util';
 import { setupSwagger } from './config/swagger';
 import { requestLoggerMiddleware } from './middleware/request-logger.middleware';
+import { getEnv } from './config/env';
+import { apiLimiter, authLimiter } from './middleware/rate-limit.middleware';
 
 const app = express();
+const { CORS_ORIGIN } = getEnv();
+
+app.set('trust proxy', 1);
 
 /**
  * ─── Logging & Security ───
@@ -30,7 +37,8 @@ const app = express();
  */
 app.use(requestLoggerMiddleware);
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: CORS_ORIGIN }));
+app.use('/api', apiLimiter); // Application-wide limit
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -40,7 +48,7 @@ app.use(express.urlencoded({ extended: true }));
  * Útil para monitoreo y para que Docker sepa si el contenedor está saludable.
  */
 app.get('/api/health', (_req, res) => {
-    sendSuccess(res, { uptime: process.uptime() }, 'Q-Music API is running 🎵');
+    sendSuccess(res, { uptime: process.uptime(), version: '1.1.6' }, 'Q-Music API is running 🎵');
 });
 
 /**
@@ -59,6 +67,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/artist-songs', artistSongsRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/landing-leads', landingLeadsRoutes);
+app.use('/api/artist-files', artistFilesRoutes);
 
 /**
  * ─── Swagger Docs ───

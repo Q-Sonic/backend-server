@@ -2,106 +2,173 @@ import { Request, Response } from 'express';
 import { PaymentsService } from './payments.service';
 import { sendSuccess, sendError } from '../../utils/response.util';
 import { AuthRequest } from '../../types';
-
-const paymentsService = new PaymentsService();
+import { Logger } from '../../utils/logger.util';
 
 /**
- * Initiates a Link To Pay session.
+ * Payments Controller
+ * Handles HTTP requests for payment initialization and webhook callbacks.
  */
-export async function createLinkToPay(req: Request, res: Response): Promise<void> {
-    try {
-        const { uid, email, displayName } = (req as AuthRequest).user!;
-        const { amount, description, dev_reference } = req.body;
+export class PaymentsController {
+    /**
+     * POST /api/payments/link-to-pay
+     * Generates a payment link to redirect the user to Nuvei (Paymentez).
+     */
+    static async createLinkToPay(req: Request, res: Response) {
+        try {
+            const { uid, email, displayName } = (req as AuthRequest).user!;
+            const { amount, description, dev_reference } = req.body;
 
-        if (!amount || !description || !dev_reference) {
-            sendError({ res, error: 'amount, description and dev_reference are required', statusCode: 400 });
-            return;
-        }
-
-        const nameParts = (displayName || 'User').split(' ');
-        const name = nameParts[0];
-        const lastName = nameParts.slice(1).join(' ') || 'N/A';
-
-        const result = await paymentsService.createPaymentLink({
-            user: { 
-                id: uid, 
-                email: email || '', 
-                name, 
-                last_name: lastName 
-            },
-            order: {
-                dev_reference,
-                description,
-                amount: Number(amount)
+            if (!amount || !description || !dev_reference) {
+                return sendError({ res, error: 'Faltan parámetros de pago (amount, description, dev_reference)', statusCode: 400 });
             }
-        });
 
-        sendSuccess(res, result, 'Payment link generated successfully');
-    } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to generate payment link';
-        sendError({ res, error: message, statusCode: 400 });
-    }
-}
+            const nameParts = (displayName || 'User').split(' ');
+            const name = nameParts[0];
+            const lastName = nameParts.slice(1).join(' ') || 'N/A';
 
-/**
- * Handle incoming webhooks from Nuvei/Paymentez.
- */
-export async function handleWebhook(req: Request, res: Response): Promise<void> {
-    try {
-        const payload = req.body;
-        
-        // Basic check to ensure it's from Nuvei (you can add more IP/Signature validation later)
-        if (!payload.transaction || !payload.transaction.dev_reference) {
-            sendError({ res, error: 'Invalid webhook payload', statusCode: 400 });
-            return;
+            const result = await PaymentsService.createPaymentLink({
+                user: { 
+                    id: uid, 
+                    email: email || '', 
+                    name, 
+                    last_name: lastName 
+                },
+                order: {
+                    dev_reference,
+                    description,
+                    amount: Number(amount)
+                }
+            });
+
+            return sendSuccess(res, result, 'Link de pago generado exitosamente');
+        } catch (error: any) {
+            Logger.error('[PaymentsController] Error:', error.message);
+            return sendError({ res, error: error.message || 'Error al generar el link de pago', statusCode: 500 });
         }
-
-        const result = await paymentsService.handleWebhook(payload);
-        
-        // Nuvei expects a success response to stop retrying
-        sendSuccess(res, result, 'Webhook processed');
-    } catch (err) {
-        const message = err instanceof Error ? err.message : 'Webhook processing failed';
-        sendError({ res, error: message, statusCode: 500 });
     }
-}
 
-/**
- * Handle refund requests.
- */
-export async function refund(req: Request, res: Response): Promise<void> {
-    try {
-        const { transactionId, amount, description } = req.body;
-
-        if (!transactionId) {
-            sendError({ res, error: 'transactionId is required', statusCode: 400 });
-            return;
+    /**
+     * POST /api/payments/webhook
+     * Callback received from Nuvei for transaction status updates.
+     */
+    static async handleWebhook(req: Request, res: Response) {
+        try {
+            const result = await PaymentsService.handleWebhook(req.body);
+            return sendSuccess(res, result, 'Webhook procesado exitosamente');
+        } catch (error: any) {
+            Logger.error('[PaymentsController Webhook] Error:', error.message);
+            return res.status(200).send('Webhook error handled');
         }
-
-        const result = await paymentsService.refund(transactionId, amount, description);
-        sendSuccess(res, result, 'Refund processed successfully');
-    } catch (err) {
-        const message = err instanceof Error ? err.message : 'Refund failed';
-        sendError({ res, error: message, statusCode: 400 });
     }
-}
-/**
- * Handle withdrawal requests from artists.
- */
-export async function withdraw(req: Request, res: Response): Promise<void> {
-    try {
-        const { uid } = (req as AuthRequest).user!;
-        const { amount } = req.body;
 
-        if (!amount || Number(amount) <= 0) {
-            sendError({ res, error: 'Amount must be greater than 0', statusCode: 400 });
-            return;
+    /**
+     * POST /api/payments/withdraw
+     * Process a withdrawal request from an artist.
+     */
+    static async withdraw(req: Request, res: Response) {
+        try {
+            const { uid } = (req as AuthRequest).user!;
+            const { amount, bankDetails } = req.body;
+
+            if (!amount || !bankDetails || Number(amount) <= 0) {
+                return sendError({ res, error: 'Parámetros inválidos (amount > 0, bankDetails requerido)', statusCode: 400 });
+            }
+
+            const result = await PaymentsService.requestWithdraw(uid, {
+                amount: Number(amount),
+                bankDetails
+            });
+
+            return sendSuccess(res, result, 'Solicitud de retiro procesada exitosamente');
+        } catch (error: any) {
+            Logger.error('[PaymentsController Withdraw] Error:', error.message);
+            return sendError({ res, error: error.message || 'Error al procesar el retiro', statusCode: 500 });
         }
+    }
 
-        const result = await paymentsService.withdraw(uid, Number(amount));
-        sendSuccess(res, result, 'Withdrawal processed successfully');
-    } catch (err) {
-        const message = err instanceof Error ? err.message : 'Withdrawal failed';
-        sendError({ res, error: message, statusCode: 400 });
+    /**
+     * PUT /api/payments/admin/withdrawals/:id
+     * Update status (COMPLETED/REJECTED) - Admin Only.
+     */
+    static async updateWithdrawalStatus(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { status, reason } = req.body;
+            const { uid: adminId } = (req as AuthRequest).user!;
+
+            if (!status) {
+                return sendError({ res, error: 'Faltan parámetros (status)', statusCode: 400 });
+            }
+
+            const data = await PaymentsService.updateWithdrawalStatus(
+                adminId, 
+                id as string, 
+                status as any, 
+                reason as string
+            );
+            return sendSuccess(res, data, `Solicitud de retiro actualizada a ${status}`);
+        } catch (error: any) {
+            Logger.error('[PaymentsController Admin] Error:', error.message);
+            return sendError({ res, error: error.message || 'Error al actualizar el retiro', statusCode: 500 });
+        }
+    }
+
+    /**
+     * POST /api/payments/refund
+     */
+    static async refund(req: Request, res: Response): Promise<void> {
+        try {
+            const { transactionId, amount, description } = req.body;
+
+            if (!transactionId) {
+                sendError({ res, error: 'transactionId is required', statusCode: 400 });
+                return;
+            }
+
+            const result = await PaymentsService.refund(transactionId, amount, description);
+            sendSuccess(res, result, 'Refund processed successfully');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Refund failed';
+            sendError({ res, error: message, statusCode: 400 });
+        }
+    }
+
+    /**
+     * GET /api/payments/withdrawals
+     */
+    static async getArtistWithdrawals(req: Request, res: Response) {
+        try {
+            const { uid } = (req as AuthRequest).user!;
+            const data = await PaymentsService.getArtistWithdrawals(uid);
+            return sendSuccess(res, data, 'Historial de retiros obtenido');
+        } catch (error: any) {
+            return sendError({ res, error: error.message, statusCode: 500 });
+        }
+    }
+
+    /**
+     * GET /api/payments/transactions
+     */
+    static async getArtistTransactions(req: Request, res: Response) {
+        try {
+            const { uid } = (req as AuthRequest).user!;
+            const data = await PaymentsService.getArtistTransactions(uid);
+            return sendSuccess(res, data, 'Historial de transacciones obtenido');
+        } catch (error: any) {
+            return sendError({ res, error: error.message, statusCode: 500 });
+        }
+    }
+
+    /**
+     * GET /api/payments/admin/withdrawals
+     */
+    static async getAllWithdrawals(req: Request, res: Response) {
+        try {
+            const { status } = req.query;
+            const data = await PaymentsService.getAllWithdrawals(status as string);
+            return sendSuccess(res, data, 'Listado de solicitudes obtenido');
+        } catch (error: any) {
+            return sendError({ res, error: error.message, statusCode: 500 });
+        }
     }
 }

@@ -1,9 +1,76 @@
 import { getFirestore, admin } from '../../config/firebase';
-import { DashboardStats, ContractRecord, ArtistProfileRecord } from '../../types';
+import { DashboardStats, ContractRecord } from '../../types';
 import { ContractStatus } from '../../enum/contract.enum';
 
-const CONTRACTS_COLLECTION = 'contracts';
 const PROFILES_COLLECTION = 'artist_profiles';
+const VISITS_DAILY_COLLECTION = 'artist_profile_visits_daily';
+
+function parseUnknownDate(raw: unknown): Date | null {
+    if (!raw) return null;
+    if (raw instanceof Date) {
+        return Number.isNaN(raw.getTime()) ? null : raw;
+    }
+
+    if (typeof raw === 'string' || typeof raw === 'number') {
+        const d = new Date(raw);
+        return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    if (typeof raw === 'object') {
+        const candidate = raw as {
+            toDate?: () => Date;
+            toMillis?: () => number;
+            seconds?: number;
+            _seconds?: number;
+            nanoseconds?: number;
+            _nanoseconds?: number;
+        };
+
+        if (typeof candidate.toDate === 'function') {
+            const d = candidate.toDate();
+            return Number.isNaN(d.getTime()) ? null : d;
+        }
+
+        if (typeof candidate.toMillis === 'function') {
+            const d = new Date(candidate.toMillis());
+            return Number.isNaN(d.getTime()) ? null : d;
+        }
+
+        const seconds = candidate.seconds ?? candidate._seconds;
+        const nanos = candidate.nanoseconds ?? candidate._nanoseconds;
+        if (typeof seconds === 'number') {
+            const millis = seconds * 1000 + (typeof nanos === 'number' ? nanos / 1e6 : 0);
+            const d = new Date(millis);
+            return Number.isNaN(d.getTime()) ? null : d;
+        }
+    }
+
+    return null;
+}
+
+function contractEventDate(contract: ContractRecord): Date | null {
+    return parseUnknownDate(contract.eventDetails?.date);
+}
+
+function numberFromUnknown(value: unknown, fallback = 0): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return fallback;
+}
+
+function isDateInCalendarMonth(d: Date, year: number, monthIndex0: number): boolean {
+    return d.getFullYear() === year && d.getMonth() === monthIndex0;
+}
+
+function toDateKeyLocal(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
 
 export class DashboardService {
     private db: admin.firestore.Firestore;
@@ -14,84 +81,112 @@ export class DashboardService {
 
     async getStats(artistUid: string): Promise<DashboardStats> {
         const now = new Date();
-        const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        const y = now.getFullYear();
+        const m = now.getMonth();
+        const lastMonthY = m === 0 ? y - 1 : y;
+        const lastMonthM = m === 0 ? 11 : m - 1;
 
-        // 1. Fetch Profile Data (for visits and balance)
-        const profileDoc = await this.db.collection(PROFILES_COLLECTION).doc(artistUid).get();
-        const profileData = profileDoc.exists ? (profileDoc.data() as ArtistProfileRecord) : null;
-
-        // 2. Fetch contracts for growth calculation
-        const allContractsSnapshot = await this.db
-            .collection(CONTRACTS_COLLECTION)
+        // 1. Fetch contracts to count events (by event date in current vs previous month)
+        const contractsSnapshot = await this.db
+            .collection('contracts')
             .where('artistId', '==', artistUid)
+            .where('status', 'in', [
+                ContractStatus.PENDING,
+                ContractStatus.PENDING_ARTIST_SIGNATURE,
+                ContractStatus.ACCEPTED,
+                ContractStatus.COMPLETED,
+            ])
             .get();
 
-        const allContracts = allContractsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        } as ContractRecord));
-
-        const currentMonthEvents = allContracts.filter(c => {
-            const date = c.createdAt.toDate();
-            return date >= startOfCurrentMonth;
-        });
-
-        const lastMonthEvents = allContracts.filter(c => {
-            const date = c.createdAt.toDate();
-            return date >= startOfLastMonth && date <= endOfLastMonth;
-        });
-
-        const totalEventsCurr = currentMonthEvents.length;
-        const totalEventsLast = lastMonthEvents.length;
-
-        let eventsGrowthPercent = 0;
-        if (totalEventsLast > 0) {
-            eventsGrowthPercent = ((totalEventsCurr - totalEventsLast) / totalEventsLast) * 100;
-        } else if (totalEventsCurr > 0) {
-            eventsGrowthPercent = 100; // From 0 to something is 100%
+        let eventsThisMonth = 0;
+        let eventsLastMonth = 0;
+        for (const doc of contractsSnapshot.docs) {
+            const contract = { id: doc.id, ...doc.data() } as ContractRecord;
+            const eventDate = contractEventDate(contract);
+            if (!eventDate) continue;
+            if (isDateInCalendarMonth(eventDate, y, m)) eventsThisMonth += 1;
+            else if (isDateInCalendarMonth(eventDate, lastMonthY, lastMonthM)) eventsLastMonth += 1;
         }
 
-        // 3. Calculate Total Balance (using the profile balance as source of truth)
-        const totalBalance = profileData?.balance || 0;
+        const totalEventsCurr = eventsThisMonth;
+        const eventsGrowthPercent =
+            eventsLastMonth === 0
+                ? eventsThisMonth > 0
+                    ? 100
+                    : 0
+                : Math.round(((eventsThisMonth - eventsLastMonth) / eventsLastMonth) * 100);
 
-        // 4. Profile Visits & History
+        // 2. Profile Data & REAL BALANCE
+        const profileDoc = await this.db.collection(PROFILES_COLLECTION).doc(artistUid).get();
+        const profileData = profileDoc.exists ? (profileDoc.data() as any) : null;
 
-        const profileVisitsTotal = profileData?.totalVisits || 0;
-        const visitsHistory = profileData?.visitsHistory || {};
+        const totalBalance = numberFromUnknown(
+            profileData?.totalBalance ?? profileData?.balance ?? profileData?.walletBalance,
+            0,
+        );
+        const profileVisitsTotal = numberFromUnknown(profileData?.totalVisits ?? profileData?.visits, 0);
 
-        // Generate chart data for the last 7 days (as shown in image)
-        const visitsChartData = this.generateWeeklyVisits(visitsHistory);
+        // 3. Next event
+        const nowMillis = now.getTime();
+        const futureEvents = contractsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as ContractRecord))
+            .filter(contract => {
+                const eventDate = contractEventDate(contract);
+                return !!eventDate && eventDate.getTime() >= nowMillis;
+            })
+            .sort((a, b) => {
+                const at = contractEventDate(a)?.getTime() || 0;
+                const bt = contractEventDate(b)?.getTime() || 0;
+                return at - bt;
+            });
 
-        // 4. Next Event (upcoming)
-        const nextEvent = allContracts
-            .filter(c => c.eventDetails.date.toDate() >= now && c.status === ContractStatus.ACCEPTED)
-            .sort((a, b) => a.eventDetails.date.toMillis() - b.eventDetails.date.toMillis())[0];
+        let nextEvent = futureEvents.length > 0 ? futureEvents[0] as any : undefined;
+
+        if (nextEvent) {
+            const clientDoc = await this.db.collection('users').doc(nextEvent.clientId).get();
+            if (clientDoc.exists) {
+                nextEvent.clientName = clientDoc.data()?.displayName || 'Cliente';
+            }
+        }
+
+        // 4. Generate chart data
+        const visitsChartData = await this.generateWeeklyVisits(artistUid, profileData?.visitsHistory || {});
 
         return {
             totalEvents: totalEventsCurr,
-            eventsGrowthPercent: Math.round(eventsGrowthPercent),
+            eventsGrowthPercent,
             totalBalance,
             profileVisitsTotal,
             visitsChartData,
-            nextEvent
+            nextEvent,
         };
     }
 
-    private generateWeeklyVisits(history: Record<string, number>) {
-        // Today and 6 days before
+    private async generateWeeklyVisits(artistUid: string, legacyHistory: Record<string, number>) {
+        const dailyVisitsSnapshot = await this.db
+            .collection(VISITS_DAILY_COLLECTION)
+            .where('artistId', '==', artistUid)
+            .get();
+
+        const dailyCountByDate = new Map<string, number>();
+        dailyVisitsSnapshot.docs.forEach((doc) => {
+            const data = doc.data() as { date?: unknown; count?: unknown };
+            const dateKey = typeof data.date === 'string' ? data.date : '';
+            if (!dateKey) return;
+            dailyCountByDate.set(dateKey, numberFromUnknown(data.count, 0));
+        });
+
         const result = [];
         const daysShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         
         for (let i = 6; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
-            const dateStr = d.toISOString().split('T')[0];
+            const dateStr = toDateKeyLocal(d);
             const dayName = daysShort[d.getDay()];
             result.push({
                 day: dayName,
-                count: history[dateStr] || 0
+                count: dailyCountByDate.get(dateStr) ?? numberFromUnknown(legacyHistory?.[dateStr], 0)
             });
         }
         return result;

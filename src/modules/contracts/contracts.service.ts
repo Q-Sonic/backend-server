@@ -1,167 +1,228 @@
-import { admin } from '../../config/firebase';
-import { ContractRecord, CreateContractInput, AddPaymentInput, PaymentItem, UserRecord } from '../../types';
-import { ContractStatus, PaymentStatus } from '../../enum/contract.enum';
-import { PdfService } from '../pdf/pdf.service';
-import { StorageService } from '../storage/storage.service';
-import { UsersService } from '../users/users.service';
-import { ArtistProfilesService } from '../artist-profiles/artist-profiles.service';
+import * as admin from 'firebase-admin';
+import { 
+    ContractRecord, 
+    CreateContractInput, 
+    ContractStatus, 
+    PaymentStatus
+} from '../../types';
+import { MailService } from '../mail/mail.service';
 import { Logger } from '../../utils/logger.util';
-import { BaseFirestoreService, PaginateOptions, PaginatedResult } from '../../helper/base.service';
 
-const COLLECTION = 'contracts';
-
-export class ContractsService extends BaseFirestoreService<ContractRecord> {
-    private pdfService: PdfService;
-    private storageService: StorageService;
-    private usersService: UsersService;
-    private artistProfilesService: ArtistProfilesService;
-
-    constructor() {
-        super(COLLECTION);
-        this.pdfService = new PdfService();
-        this.storageService = new StorageService();
-        this.usersService = new UsersService();
-        this.artistProfilesService = new ArtistProfilesService();
-    }
+/**
+ * Contracts Service
+ * Handles booking logic, legal signatures, and payment tracking.
+ */
+export class ContractsService {
+    private static db = admin.firestore();
 
     /**
-     * Get client history with pagination
+     * Find a contract by ID.
      */
-    async findClientHistory(clientId: string, options: PaginateOptions = {}): Promise<PaginatedResult<ContractRecord>> {
-        return this.paginate({
-            ...options,
-            tagField: 'clientId',
-            tagValue: clientId
-        });
-    }
-
-    /**
-     * Get artist history with pagination
-     */
-    async findArtistHistory(artistId: string, options: PaginateOptions = {}): Promise<PaginatedResult<ContractRecord>> {
-        return this.paginate({
-            ...options,
-            tagField: 'artistId',
-            tagValue: artistId
-        });
-    }
-
-    /**
-     * Detailed findById with security checks
-     */
-    async findByIdAndUser(id: string, userId: string): Promise<ContractRecord> {
-        const contract = await this.findById(id);
-        if (!contract) throw new Error('Contract not found');
+    static async findById(id: string, userId?: string): Promise<ContractRecord | null> {
+        const doc = await this.db.collection('contracts').doc(id).get();
+        if (!doc.exists) return null;
         
-        if (contract.clientId !== userId && contract.artistId !== userId) {
-            throw new Error('Access denied');
+        const data = { id: doc.id, ...doc.data() } as ContractRecord;
+        
+        if (userId && data.clientId !== userId && data.artistId !== userId) {
+            throw new Error('No tienes permiso para ver este contrato');
         }
-        return contract;
+        
+        return data;
     }
 
-    async createContract(clientId: string, input: CreateContractInput): Promise<ContractRecord> {
-        const eventDate = admin.firestore.Timestamp.fromDate(new Date(input.eventDetails.date));
+    /**
+     * Find contracts for a client with pagination.
+     */
+    static async findClientHistory(clientId: string, options: { skip: number; take: number; filterField?: string; filterValue?: string }) {
+        let query = this.db.collection('contracts')
+            .where('clientId', '==', clientId)
+            .orderBy('createdAt', 'desc');
 
-        // Get artist rider if available
-        let riderUrl: string | undefined;
-        try {
-            const artistProfile = await this.artistProfilesService.getByUid(input.artistId);
-            riderUrl = artistProfile?.technicalRiderUrl;
-        } catch { /* ignore if not found */ }
+        if (options.filterField && options.filterValue) {
+            query = query.where(options.filterField, '==', options.filterValue);
+        }
 
-        const record: Omit<ContractRecord, 'id' | 'createdAt' | 'updatedAt'> = {
+        const snapshot = await query.limit(options.take).offset(options.skip).get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
+    /**
+     * Find contracts for an artist with pagination.
+     */
+    static async findArtistHistory(artistId: string, options: { skip: number; take: number; filterField?: string; filterValue?: string }) {
+        let query = this.db.collection('contracts')
+            .where('artistId', '==', artistId)
+            .orderBy('createdAt', 'desc');
+
+        if (options.filterField && options.filterValue) {
+            query = query.where(options.filterField, '==', options.filterValue);
+        }
+
+        const snapshot = await query.limit(options.take).offset(options.skip).get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
+    /**
+     * Create a new contract (Booking Request).
+     */
+    static async createContract(clientId: string, input: CreateContractInput): Promise<ContractRecord> {
+        const now = admin.firestore.Timestamp.now();
+        
+        let eventDate: admin.firestore.Timestamp;
+        const rawDate = input.eventDetails.date;
+        if (rawDate instanceof admin.firestore.Timestamp) {
+            eventDate = rawDate;
+        } else if (rawDate instanceof Date) {
+            eventDate = admin.firestore.Timestamp.fromDate(rawDate);
+        } else if (typeof rawDate === 'string' || typeof rawDate === 'number') {
+            eventDate = admin.firestore.Timestamp.fromDate(new Date(rawDate));
+        } else {
+            eventDate = now;
+        }
+
+        if (!input.clientSignatureDataUrl || input.acceptedTerms !== true) {
+            throw new Error('La firma del cliente y la aceptación de términos son obligatorias');
+        }
+
+        const serviceDoc = await this.db.collection('artist_services').doc(input.serviceId).get();
+        if (!serviceDoc.exists) throw new Error('El servicio seleccionado no existe');
+        
+        const serviceData = serviceDoc.data();
+        if (!serviceData?.contractId) {
+            throw new Error('Este servicio no puede ser contratado porque el artista aún no ha vinculado un contrato legal al mismo.');
+        }
+
+        const sourceContractFileId = String(serviceData?.contractId || '').trim();
+        let sourceContractUrl = String(serviceData?.contractUrl || serviceData?.contractPdfUrl || '').trim();
+        let sourceContractOriginalName: string | undefined;
+
+        if (sourceContractFileId) {
+            const fileDoc = await this.db.collection('artist_files').doc(sourceContractFileId).get();
+            if (fileDoc.exists) {
+                const fd = fileDoc.data();
+                if (!sourceContractUrl) sourceContractUrl = fd?.url || '';
+                sourceContractOriginalName = fd?.originalName;
+            }
+        }
+
+        const contractData: Omit<ContractRecord, 'id'> = {
             clientId,
             artistId: input.artistId,
             serviceId: input.serviceId,
             status: ContractStatus.PENDING,
-            eventDetails: { ...input.eventDetails, date: eventDate } as any,
+            eventDetails: {
+                name: input.eventDetails.name,
+                date: eventDate,
+                location: input.eventDetails.location,
+                description: input.eventDetails.description
+            },
             financials: {
-                totalAmount: Number(input.totalAmount),
+                totalAmount: input.totalAmount,
                 paidAmount: 0,
-                paymentStatus: PaymentStatus.UNPAID,
+                paymentStatus: PaymentStatus.UNPAID
             },
             payments: [],
-            riderUrl,
+            clientSignatureUrl: input.clientSignatureDataUrl,
+            clientAcceptedTerms: true,
+            clientSignedAt: now,
+            sourceContractUrl,
+            sourceContractFileId,
+            sourceContractOriginalName,
+            riderUrl: serviceData?.riderUrl || serviceData?.technicalRiderUrl || '',
+            artistDecisionDeadlineAt: admin.firestore.Timestamp.fromMillis(now.toMillis() + (48 * 60 * 60 * 1000)),
+            createdAt: now,
+            updatedAt: now
         };
 
-        const created = await this.create(record);
-        Logger.success(`Contract created: ${created.id} for artist ${input.artistId} ($${input.totalAmount})`);
-        return created;
-    }
-
-    async updateStatus(id: string, userId: string, status: ContractStatus): Promise<ContractRecord> {
-        const contract = await this.findByIdAndUser(id, userId);
-
-        if (status === ContractStatus.CANCELLED) {
-            if (contract.clientId !== userId) throw new Error('Unauthorized to cancel this contract');
-        } else {
-            if (contract.artistId !== userId) throw new Error('Only the artist can change the status');
-        }
-
-        const updateData: Partial<ContractRecord> & { contractUrl?: string } = { status };
-
-        // --- Generate PDF only when ACCEPTED ---
-        if (status === ContractStatus.ACCEPTED && !contract.contractUrl) {
-            try {
-                const artist = await this.usersService.findById(contract.artistId);
-                const client = await this.usersService.findById(contract.clientId);
-                
-                const pdfBuffer = await this.pdfService.generateContractPdf(
-                    contract, 
-                    artist as UserRecord, 
-                    client as UserRecord
-                );
-                
-                const fileName = `contract_${id}.pdf`;
-                const contractUrl = await this.storageService.uploadFile(
-                    pdfBuffer,
-                    fileName,
-                    'application/pdf',
-                    `contracts/${id}`
-                );
-                
-                updateData.contractUrl = contractUrl;
-            } catch (pdfErr) {
-                console.error('Failed to generate/upload contract PDF:', pdfErr);
+        const docRef = await this.db.collection('contracts').add(contractData);
+        
+        // Fix: Call with 3 arguments (legacy wrapper or full)
+        try {
+            const artistDoc = await this.db.collection('users').doc(input.artistId).get();
+            const artistEmail = artistDoc.data()?.email;
+            if (artistEmail) {
+                // Using the simpler wrapper I added to MailService
+                await MailService.sendSimpleContractNotification(artistEmail, {
+                    contractId: docRef.id,
+                    clientName: 'Un cliente',
+                    eventName: input.eventDetails.name,
+                    amount: input.totalAmount
+                });
             }
+        } catch (mailError) {
+            Logger.error('[ContractsService] Error sending notification:', mailError);
         }
 
-        const updated = await this.update(id, updateData);
-        Logger.info(`Contract ${id} status changed: ${contract.status} -> ${status}`);
-        return updated;
+        return { id: docRef.id, ...contractData } as ContractRecord;
     }
 
-    async addPayment(id: string, userId: string, input: AddPaymentInput): Promise<ContractRecord> {
-        const contract = await this.findByIdAndUser(id, userId);
-        if (contract.artistId !== userId) throw new Error('Unauthorized to register payment');
+    /**
+     * Update contract status (Accept/Reject/Complete).
+     */
+    static async updateStatus(id: string, userId: string, status: ContractStatus, options: { artistSignatureDataUrl?: string, acceptedTerms?: boolean, rejectionReason?: string }) {
+        const contract = await this.findById(id, userId);
+        if (!contract) throw new Error('Contract not found');
 
-        const now = admin.firestore.Timestamp.now();
-        const newPayment: PaymentItem = {
-            amount: Number(input.amount),
-            date: now,
+        const updates: any = { status, updatedAt: admin.firestore.Timestamp.now() };
+
+        if (status === ContractStatus.ACCEPTED) {
+            if (!options.artistSignatureDataUrl || options.acceptedTerms !== true) {
+                throw new Error('Artist signature and terms acceptance required');
+            }
+            updates.artistSignatureUrl = options.artistSignatureDataUrl;
+            updates.artistAcceptedTerms = true;
+            updates.artistSignedAt = admin.firestore.Timestamp.now();
+        }
+
+        if (status === ContractStatus.REJECTED) {
+            updates.artistRejectionReason = options.rejectionReason || 'No especificado';
+        }
+
+        await this.db.collection('contracts').doc(id).update(updates);
+        return { ...contract, ...updates };
+    }
+
+    /**
+     * Record a payment for a contract.
+     */
+    static async addPayment(id: string, userId: string, input: { amount: number; reference?: string; method?: string }) {
+        const contract = await this.findById(id, userId);
+        if (!contract) throw new Error('Contract not found');
+
+        const newPayment = {
+            amount: input.amount,
             reference: input.reference || '',
             method: input.method || 'cash',
+            date: admin.firestore.Timestamp.now()
         };
 
-        const updatedPaidAmount = Number(contract.financials.paidAmount) + newPayment.amount;
+        const newPaidAmount = (contract.financials?.paidAmount || 0) + input.amount;
         let newPaymentStatus = PaymentStatus.PARTIAL;
-
-        if (updatedPaidAmount >= contract.financials.totalAmount) {
+        if (newPaidAmount >= (contract.financials?.totalAmount || 0)) {
             newPaymentStatus = PaymentStatus.PAID;
-        } else if (updatedPaidAmount <= 0) {
-            newPaymentStatus = PaymentStatus.UNPAID;
         }
 
-        // Use standard update for metadata, but we need special arrayUnion for payments
-        const ref = this.db.collection(COLLECTION).doc(id);
-        await ref.update({
-            payments: admin.firestore.FieldValue.arrayUnion(newPayment),
-            'financials.paidAmount': updatedPaidAmount,
+        await this.db.collection('contracts').doc(id).update({
+            'financials.paidAmount': newPaidAmount,
             'financials.paymentStatus': newPaymentStatus,
-            updatedAt: now,
+            payments: admin.firestore.FieldValue.arrayUnion(newPayment),
+            updatedAt: admin.firestore.Timestamp.now()
         });
 
-        Logger.success(`Payment added to contract ${id}: $${newPayment.amount} (Total paid: $${updatedPaidAmount})`);
-        return this.findByIdAndUser(id, userId);
+        return { ...contract, financials: { ...contract.financials, paidAmount: newPaidAmount, paymentStatus: newPaymentStatus } };
+    }
+
+    /**
+     * Bulk sign all PENDING contracts for an artist.
+     */
+    static async bulkSignAccepted(artistId: string) {
+        const snapshot = await this.db.collection('contracts')
+            .where('artistId', '==', artistId)
+            .where('status', '==', ContractStatus.PENDING)
+            .get();
+
+        const results = snapshot.docs.map(doc => doc.id);
+        return results;
     }
 }

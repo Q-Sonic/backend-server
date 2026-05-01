@@ -3,107 +3,168 @@ import { ACCOUNT_CHANGE_CODE_TTL_MINUTES } from '../../config/account-change.con
 import { getEnv } from '../../config/env';
 import { Logger } from '../../utils/logger.util';
 
-let transporter: nodemailer.Transporter | null = null;
+/**
+ * Mail Service
+ * Unified class for sending notifications via SMTP.
+ */
+export class MailService {
+    private static transporter: nodemailer.Transporter | null = null;
 
-function getTransporter(): nodemailer.Transporter {
-    if (transporter) return transporter;
-    const env = getEnv();
-    if (!env.SMTP_USER || !env.SMTP_PASS) {
-        throw new Error('SMTP no configurado: define SMTP_USER y SMTP_PASS en .env');
+    private static getTransporter(): nodemailer.Transporter {
+        if (this.transporter) return this.transporter;
+        const env = getEnv();
+        if (!env.SMTP_USER || !env.SMTP_PASS) {
+            throw new Error('SMTP no configurado: define SMTP_USER y SMTP_PASS en .env');
+        }
+        this.transporter = nodemailer.createTransport({
+            host: env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(env.SMTP_PORT || '587', 10),
+            secure: env.SMTP_SECURE === 'true',
+            auth: {
+                user: env.SMTP_USER,
+                pass: env.SMTP_PASS,
+            },
+        });
+        return this.transporter;
     }
-    transporter = nodemailer.createTransport({
-        host: env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(env.SMTP_PORT || '587', 10),
-        secure: env.SMTP_SECURE === 'true',
-        auth: {
-            user: env.SMTP_USER,
-            pass: env.SMTP_PASS,
-        },
-    });
-    return transporter;
-}
 
-export function isSmtpConfigured(): boolean {
-    const env = getEnv();
-    return !!(env.SMTP_USER && env.SMTP_PASS);
-}
-
-export async function sendAccountChangeVerificationCode(to: string, code: string, displayName: string): Promise<void> {
-    const env = getEnv();
-    const mailFrom = env.MAIL_FROM?.trim();
-    const smtpUser = env.SMTP_USER?.trim();
-    /** Si MAIL_FROM no es un correo, usar solo la cuenta SMTP como remitente. */
-    const fromAddr =
-        mailFrom && mailFrom.includes('@')
-            ? mailFrom
-            : smtpUser
-              ? `StageGo <${smtpUser}>`
-              : '';
-    if (!fromAddr) {
-        throw new Error('SMTP_USER requerido para enviar correo.');
+    private static getFromAddress(): string {
+        const env = getEnv();
+        const mailFrom = env.MAIL_FROM?.trim();
+        const smtpUser = env.SMTP_USER?.trim();
+        return (mailFrom && mailFrom.includes('@')) ? mailFrom : `StageGo <${smtpUser}>`;
     }
-    const tx = getTransporter();
-    const subject = 'Código de verificación — cambio de cuenta';
-    const ttl = ACCOUNT_CHANGE_CODE_TTL_MINUTES;
-    const text = `Hola${displayName ? ` ${displayName}` : ''},\n\nTu código para confirmar cambios de correo o contraseña es: ${code}\n\nCaduca en ${ttl} minutos. Si no lo solicitaste, ignora este mensaje.\n`;
-    const html = `<p>Hola${displayName ? ` <strong>${escapeHtml(displayName)}</strong>` : ''},</p>
-<p>Tu código para confirmar cambios de <strong>correo o contraseña</strong> es:</p>
-<p style="font-size:1.5rem;letter-spacing:0.25em;font-weight:bold;">${escapeHtml(code)}</p>
-<p>Caduca en ${ttl} minutos. Si no lo solicitaste, ignora este correo.</p>`;
 
-    await tx.sendMail({
-        from: fromAddr.includes('<') || fromAddr.includes('@') ? fromAddr : `Q-Sonic <${fromAddr}>`,
-        to,
-        subject,
-        text,
-        html,
-    });
-    Logger.info(`Account change code email sent to ${to}`);
-}
+    private static escapeHtml(s: string): string {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
 
-export async function sendPaymentConfirmationEmail(to: string, data: {
-    userName: string;
-    orderId: string;
-    amount: number;
-    transactionId: string;
-    authorizationCode: string;
-}): Promise<void> {
-    const env = getEnv();
-    const smtpUser = env.SMTP_USER?.trim();
-    const fromAddr = `StageGo <${smtpUser}>`;
-    
-    const tx = getTransporter();
-    const subject = `Confirmación de Pago — Orden #${data.orderId}`;
-    
-    const html = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
-            <h2 style="color: #333;">¡Pago Confirmado! 🎵</h2>
-            <p>Hola <strong>${escapeHtml(data.userName)}</strong>,</p>
-            <p>Hemos procesado correctamente tu pago para la orden <strong>#${data.orderId}</strong>.</p>
-            <hr />
-            <table style="width: 100%;">
-                <tr><td><strong>Monto:</strong></td><td>$${data.amount.toFixed(2)}</td></tr>
-                <tr><td><strong>ID Transacción:</strong></td><td>${data.transactionId}</td></tr>
-                <tr><td><strong>Código Autorización:</strong></td><td>${data.authorizationCode}</td></tr>
-            </table>
-            <hr />
-            <p>¡Gracias por ser parte de Q-Music!</p>
-        </div>
-    `;
+    static async sendAccountChangeVerificationCode(to: string, code: string, displayName: string): Promise<void> {
+        const tx = this.getTransporter();
+        const subject = 'Código de verificación — cambio de cuenta';
+        const ttl = ACCOUNT_CHANGE_CODE_TTL_MINUTES;
+        const text = `Hola${displayName ? ` ${displayName}` : ''},\n\nTu código para confirmar cambios de correo o contraseña es: ${code}\n\nCaduca en ${ttl} minutos.`;
+        const html = `<p>Hola${displayName ? ` <strong>${this.escapeHtml(displayName)}</strong>` : ''},</p>
+<p>Tu código para confirmar cambios es: <strong style="font-size:1.2rem;">${this.escapeHtml(code)}</strong></p>
+<p>Caduca en ${ttl} minutos.</p>`;
 
-    await tx.sendMail({
-        from: fromAddr,
-        to,
-        subject,
-        html,
-    });
-    Logger.info(`Payment confirmation email sent to ${to} for order ${data.orderId}`);
-}
+        await tx.sendMail({
+            from: this.getFromAddress(),
+            to,
+            subject,
+            text,
+            html,
+        });
+        Logger.info(`Account change code email sent to ${to}`);
+    }
 
-function escapeHtml(s: string): string {
-    return s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    static async sendPaymentConfirmationEmail(to: string, data: {
+        userName: string;
+        orderId: string;
+        amount: number;
+        transactionId: string;
+        authorizationCode: string;
+    }): Promise<void> {
+        const tx = this.getTransporter();
+        const subject = `Confirmación de Pago — Orden #${data.orderId}`;
+        const html = `<p>Hola ${this.escapeHtml(data.userName)}, pago confirmado por $${data.amount}. Transacción: ${data.transactionId}</p>`;
+
+        await tx.sendMail({
+            from: this.getFromAddress(),
+            to,
+            subject,
+            html,
+        });
+        Logger.info(`Payment confirmation email sent to ${to}`);
+    }
+
+    static async sendWithdrawalRequestNotification(artistName: string, amount: number, bankDetails: any): Promise<void> {
+        const env = getEnv();
+        const adminEmail = env.ADMIN_EMAIL || env.SMTP_USER;
+        if (!adminEmail) return;
+
+        const tx = this.getTransporter();
+        const subject = `⚠️ Nueva Solicitud de Retiro: ${artistName}`;
+        const html = `<p>Artista: ${artistName}, Monto: $${amount}</p>`;
+
+        await tx.sendMail({
+            from: `StageGo Billing <${env.SMTP_USER}>`,
+            to: adminEmail,
+            subject,
+            html,
+        });
+        Logger.info(`Withdrawal notification sent to admin`);
+    }
+
+    static async sendWelcomeEmail(to: string, displayName: string): Promise<void> {
+        const tx = this.getTransporter();
+        const subject = '¡Bienvenido a StageGo! 🎤';
+        const html = `<p>Hola ${this.escapeHtml(displayName)}, bienvenido a la plataforma.</p>`;
+
+        await tx.sendMail({
+            from: this.getFromAddress(),
+            to,
+            subject,
+            html,
+        });
+        Logger.info(`Welcome email sent to ${to}`);
+    }
+
+    static async sendPasswordResetEmail(to: string, code: string, displayName: string): Promise<void> {
+        const tx = this.getTransporter();
+        const subject = 'Restablecer tu contraseña — StageGo';
+        const html = `<p>Hola ${this.escapeHtml(displayName)}, tu código de recuperación es: ${code}</p>`;
+
+        await tx.sendMail({
+            from: this.getFromAddress(),
+            to,
+            subject,
+            html,
+        });
+        Logger.info(`Password reset email sent to ${to}`);
+    }
+
+    static async sendContractSignedNotification(to: string, role: 'artist' | 'client', details: {
+        contractId: string;
+        contractUrl?: string;
+        serviceName: string;
+        eventName: string;
+        artistName: string;
+        clientName: string;
+    }): Promise<void> {
+        const tx = this.getTransporter();
+        const subject = role === 'artist' 
+            ? `✅ ¡Contrato Confirmado! - ${details.eventName}`
+            : `✅ ¡Tu reserva está lista! - ${details.artistName}`;
+        
+        const html = `<p>Hola ${role === 'artist' ? this.escapeHtml(details.artistName) : this.escapeHtml(details.clientName)}, se ha firmado el contrato para ${this.escapeHtml(details.eventName)}.</p>`;
+
+        await tx.sendMail({
+            from: `StageGo Contracts <${getEnv().SMTP_USER}>`,
+            to,
+            subject,
+            html,
+        });
+        Logger.info(`Contract signed notification sent to ${role}: ${to}`);
+    }
+
+    /**
+     * Compatibility wrapper for simple notification (legacy/simplified call)
+     */
+    static async sendSimpleContractNotification(to: string, details: { contractId: string; clientName: string; eventName: string; amount: number }): Promise<void> {
+        const tx = this.getTransporter();
+        const subject = `✅ ¡Nueva contratación! - ${details.eventName}`;
+        const html = `<p>Hola, tienes una nueva solicitud de contrato para ${details.eventName} por un monto de $${details.amount}.</p>`;
+
+        await tx.sendMail({
+            from: this.getFromAddress(),
+            to,
+            subject,
+            html,
+        });
+    }
 }

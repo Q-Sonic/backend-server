@@ -9,6 +9,8 @@ import {
 import { ContractStatus } from '../../enum/contract.enum';
 
 const COLLECTION = 'artist_profiles';
+const VISITS_DAILY_COLLECTION = 'artist_profile_visits_daily';
+const UNIQUE_VISITS_DAILY_COLLECTION = 'artist_profile_unique_visits_daily';
 
 const emptySocialNetworks: SocialNetworks = {};
 
@@ -25,6 +27,50 @@ export class ArtistProfilesService {
         return { uid: doc.id, ...doc.data() } as ArtistProfileRecord;
     }
 
+    private normalizeText(value?: string): string {
+        return (value ?? '').trim().toLowerCase();
+    }
+
+    private toDateKey(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    private chunkArray<T>(arr: T[], size: number): T[][] {
+        const chunks: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) {
+            chunks.push(arr.slice(i, i + size));
+        }
+        return chunks;
+    }
+
+    private async getServicesByArtistIds(
+        artistIds: string[]
+    ): Promise<Map<string, Array<{ price?: number }>>> {
+        const result = new Map<string, Array<{ price?: number }>>();
+        if (artistIds.length === 0) return result;
+
+        const chunks = this.chunkArray(artistIds, 30);
+        for (const ids of chunks) {
+            const snapshot = await this.db
+                .collection('artist_services')
+                .where('artistId', 'in', ids)
+                .get();
+            snapshot.docs.forEach((doc) => {
+                const data = doc.data() as { artistId?: string; price?: number };
+                const artistId = data.artistId;
+                if (!artistId) return;
+                const current = result.get(artistId) ?? [];
+                current.push({ price: data.price });
+                result.set(artistId, current);
+            });
+        }
+
+        return result;
+    }
+
     /** List and filter artist profiles (for client/admin browse). */
     async listAll(filters?: { 
         genre?: string; 
@@ -32,34 +78,79 @@ export class ArtistProfilesService {
         minPrice?: number; 
         maxPrice?: number; 
         search?: string;
+        availableToday?: boolean;
+        date?: string;
     }): Promise<ArtistProfileRecord[]> {
-        let query: admin.firestore.Query = this.db.collection(COLLECTION);
-
-        if (filters?.genre) {
-            query = query.where('genre', '==', filters.genre);
-        }
-        if (filters?.city) {
-            query = query.where('city', '==', filters.city);
-        }
-        if (filters?.minPrice !== undefined) {
-            query = query.where('minPrice', '>=', filters.minPrice);
-        }
-        if (filters?.maxPrice !== undefined) {
-            query = query.where('minPrice', '<=', filters.maxPrice);
-        }
-
-        const snapshot = await query.get();
+        const snapshot = await this.db.collection(COLLECTION).get();
         let profiles = snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() } as ArtistProfileRecord));
 
-        // Basic text search in memory for now if search string is provided
+        if (filters?.genre) {
+            const normalizedGenre = this.normalizeText(filters.genre);
+            profiles = profiles.filter((p) => this.normalizeText(p.genre) === normalizedGenre);
+        }
+
+        if (filters?.city) {
+            const normalizedCity = this.normalizeText(filters.city);
+            profiles = profiles.filter((p) => this.normalizeText(p.city) === normalizedCity);
+        }
+
         if (filters?.search) {
-            const s = filters.search.toLowerCase();
+            const s = this.normalizeText(filters.search);
             profiles = profiles.filter(p => 
-                p.biography.toLowerCase().includes(s) || 
+                this.normalizeText(p.biography).includes(s) || 
+                this.normalizeText(p.city).includes(s) ||
+                (p as any).name?.toLowerCase().includes(s) ||
                 (p as any).displayName?.toLowerCase().includes(s)
             );
         }
 
+        const needsServiceFiltering =
+            filters?.minPrice !== undefined || filters?.maxPrice !== undefined || filters?.availableToday === true;
+        if (!needsServiceFiltering) return profiles;
+
+        const servicesByArtistId = await this.getServicesByArtistIds(profiles.map((p) => p.uid));
+        const dateKey = filters?.date
+            ? filters.date
+            : this.toDateKey(new Date());
+        const availableTodayCache = new Map<string, boolean>();
+
+        const filteredProfiles: ArtistProfileRecord[] = [];
+        for (const profile of profiles) {
+            const services = servicesByArtistId.get(profile.uid) ?? [];
+            const hasServices = services.length > 0;
+            if (!hasServices) {
+                continue;
+            }
+
+            if (filters?.minPrice !== undefined || filters?.maxPrice !== undefined) {
+                const hasMatchingService = services.some((service) => {
+                    const price = Number(service.price);
+                    if (!Number.isFinite(price)) return false;
+                    if (filters?.minPrice !== undefined && price < filters.minPrice) return false;
+                    if (filters?.maxPrice !== undefined && price > filters.maxPrice) return false;
+                    return true;
+                });
+                if (!hasMatchingService) continue;
+            }
+
+            if (filters?.availableToday === true) {
+                let isAvailableToday = availableTodayCache.get(profile.uid);
+                if (isAvailableToday === undefined) {
+                    const availability = await this.getAvailability(profile.uid);
+                    const isUnavailable =
+                        availability.blocked.includes(dateKey) ||
+                        availability.reserved.includes(dateKey) ||
+                        availability.pending.includes(dateKey);
+                    isAvailableToday = !isUnavailable;
+                    availableTodayCache.set(profile.uid, isAvailableToday);
+                }
+                if (!isAvailableToday) continue;
+            }
+
+            filteredProfiles.push(profile);
+        }
+
+        profiles = filteredProfiles;
         return profiles;
     }
 
@@ -79,7 +170,7 @@ export class ArtistProfilesService {
 
         const media = input.media !== undefined ? input.media : existing?.media;
         const songs = input.songs !== undefined ? input.songs : existing?.songs;
-        const blockedDates = input.blockedDates !== undefined ? input.blockedDates : existing?.blockedDates;
+        const blockedDates = input.blockedDates !== undefined ? [...new Set(input.blockedDates)] : existing?.blockedDates;
         const featuredSong = input.featuredSong !== undefined ? input.featuredSong : existing?.featuredSong;
         const technicalRiderUrl = input.technicalRiderUrl !== undefined ? input.technicalRiderUrl : existing?.technicalRiderUrl;
 
@@ -129,7 +220,12 @@ export class ArtistProfilesService {
         // Query all contracts for this artist
         const contractsSnapshot = await this.db.collection('contracts')
             .where('artistId', '==', uid)
-            .where('status', 'in', [ContractStatus.ACCEPTED, ContractStatus.PENDING, ContractStatus.COMPLETED])
+            .where('status', 'in', [
+                ContractStatus.ACCEPTED,
+                ContractStatus.PENDING,
+                ContractStatus.PENDING_ARTIST_SIGNATURE,
+                ContractStatus.COMPLETED,
+            ])
             .get();
 
         contractsSnapshot.docs.forEach(doc => {
@@ -139,7 +235,7 @@ export class ArtistProfilesService {
 
             if (data.status === ContractStatus.ACCEPTED || data.status === ContractStatus.COMPLETED) {
                 availability.reserved.push(dateStr);
-            } else if (data.status === ContractStatus.PENDING) {
+            } else if (data.status === ContractStatus.PENDING || data.status === ContractStatus.PENDING_ARTIST_SIGNATURE) {
                 availability.pending.push(dateStr);
             }
         });
@@ -151,24 +247,58 @@ export class ArtistProfilesService {
         return availability;
     }
 
-    /** Increment visit count and daily history. */
-    async incrementVisits(uid: string): Promise<void> {
-        const ref = this.db.collection(COLLECTION).doc(uid);
-        const todayStr = new Date().toISOString().split('T')[0];
+    /** Increment unique visit count once per viewer per artist per day. */
+    async incrementVisits(uid: string, viewerUid: string): Promise<void> {
+        if (!viewerUid || viewerUid === uid) return;
+
+        const profileRef = this.db.collection(COLLECTION).doc(uid);
+        const now = admin.firestore.Timestamp.now();
+        const todayStr = this.toDateKey(new Date());
+        const dailyDocId = `${uid}_${todayStr}`;
+        const dailyRef = this.db.collection(VISITS_DAILY_COLLECTION).doc(dailyDocId);
+        const uniqueVisitDocId = `${uid}_${viewerUid}_${todayStr}`;
+        const uniqueVisitRef = this.db.collection(UNIQUE_VISITS_DAILY_COLLECTION).doc(uniqueVisitDocId);
 
         await this.db.runTransaction(async (transaction) => {
-            const doc = await transaction.get(ref);
-            if (!doc.exists) return;
+            const profileDoc = await transaction.get(profileRef);
+            if (!profileDoc.exists) return;
+            const dailyDoc = await transaction.get(dailyRef);
+            const uniqueVisitDoc = await transaction.get(uniqueVisitRef);
+            if (uniqueVisitDoc.exists) {
+                // Already counted this viewer today for this artist.
+                return;
+            }
 
-            const data = doc.data() as ArtistProfileRecord;
-            const currentTotal = (data as any).totalVisits || 0;
-            const currentHistory = (data as any).visitsHistory || {};
-            const todayCount = currentHistory[todayStr] || 0;
+            const profileData = profileDoc.data() as ArtistProfileRecord;
+            const currentTotal = (profileData as any).totalVisits || 0;
+            const currentDailyCount = dailyDoc.exists
+                ? Number((dailyDoc.data() as { count?: number }).count ?? 0)
+                : 0;
+            const nextDailyCount = currentDailyCount + 1;
 
-            transaction.update(ref, {
+            transaction.update(profileRef, {
                 totalVisits: currentTotal + 1,
-                [`visitsHistory.${todayStr}`]: todayCount + 1,
-                updatedAt: admin.firestore.Timestamp.now(),
+                updatedAt: now,
+            });
+
+            transaction.set(
+                dailyRef,
+                {
+                    artistId: uid,
+                    date: todayStr,
+                    count: nextDailyCount,
+                    createdAt: dailyDoc.exists ? (dailyDoc.data() as { createdAt?: unknown }).createdAt ?? now : now,
+                    updatedAt: now,
+                },
+                { merge: true }
+            );
+
+            transaction.set(uniqueVisitRef, {
+                artistId: uid,
+                viewerId: viewerUid,
+                date: todayStr,
+                createdAt: now,
+                updatedAt: now,
             });
         });
     }

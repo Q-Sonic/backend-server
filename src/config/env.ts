@@ -36,6 +36,7 @@ interface EnvConfig {
     FIREBASE_SERVICE_ACCOUNT_BASE64: string;
     FIREBASE_STORAGE_BUCKET: string;
     FIREBASE_WEB_API_KEY: string;
+    CORS_ORIGIN: string;
     /** Secreto para firmar códigos de cambio de cuenta (cualquier string largo aleatorio). */
     ACCOUNT_CHANGE_CODE_SECRET: string;
     /** Gmail SMTP: normalmente smtp.gmail.com */
@@ -49,6 +50,13 @@ interface EnvConfig {
     SMTP_PASS: string;
     /** Remitente; por defecto SMTP_USER. Ej: "Q-Sonic <noreply@gmail.com>" */
     MAIL_FROM: string;
+    /** Email to receive notifications (withdrawals, etc.) */
+    ADMIN_EMAIL?: string;
+    NUVEI_LTP_SERVER_KEY: string;
+    NUVEI_LTP_SERVER_SECRET: string;
+    NUVEI_API_ENDPOINT: string;
+    /** Frontend DNS URL (e.g. http://localhost:5173 or https://q-sonic.vercel.app) */
+    FRONT_DNS: string;
 }
 
 export function getEnv(): EnvConfig {
@@ -58,6 +66,7 @@ export function getEnv(): EnvConfig {
         FIREBASE_SERVICE_ACCOUNT_BASE64,
         FIREBASE_STORAGE_BUCKET,
         FIREBASE_WEB_API_KEY,
+        CORS_ORIGIN,
         ACCOUNT_CHANGE_CODE_SECRET,
         SMTP_HOST,
         SMTP_PORT,
@@ -65,6 +74,11 @@ export function getEnv(): EnvConfig {
         SMTP_USER,
         SMTP_PASS,
         MAIL_FROM,
+        ADMIN_EMAIL,
+        NUVEI_LTP_SERVER_KEY,
+        NUVEI_LTP_SERVER_SECRET,
+        NUVEI_API_ENDPOINT,
+        FRONT_DNS,
     } = process.env;
 
     return {
@@ -73,6 +87,7 @@ export function getEnv(): EnvConfig {
         FIREBASE_SERVICE_ACCOUNT_BASE64: FIREBASE_SERVICE_ACCOUNT_BASE64 || '',
         FIREBASE_STORAGE_BUCKET: FIREBASE_STORAGE_BUCKET || '',
         FIREBASE_WEB_API_KEY: FIREBASE_WEB_API_KEY || '',
+        CORS_ORIGIN: CORS_ORIGIN || '*',
         ACCOUNT_CHANGE_CODE_SECRET: cleanEnvValue(ACCOUNT_CHANGE_CODE_SECRET),
         SMTP_HOST: cleanEnvValue(SMTP_HOST) || 'smtp.gmail.com',
         SMTP_PORT: cleanEnvValue(SMTP_PORT) || '587',
@@ -80,5 +95,10 @@ export function getEnv(): EnvConfig {
         SMTP_USER: cleanEnvValue(SMTP_USER),
         SMTP_PASS: cleanEnvValue(SMTP_PASS, { stripSpaces: true }),
         MAIL_FROM: cleanEnvValue(MAIL_FROM),
+        ADMIN_EMAIL: cleanEnvValue(ADMIN_EMAIL),
+        NUVEI_LTP_SERVER_KEY: cleanEnvValue(NUVEI_LTP_SERVER_KEY),
+        NUVEI_LTP_SERVER_SECRET: cleanEnvValue(NUVEI_LTP_SERVER_SECRET),
+        NUVEI_API_ENDPOINT: cleanEnvValue(NUVEI_API_ENDPOINT),
+        FRONT_DNS: cleanEnvValue(FRONT_DNS) || 'https://q-sonic.vercel.app',
     };
 }

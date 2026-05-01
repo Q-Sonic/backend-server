@@ -1,0 +1,13 @@
+[dotenv@17.3.1] injecting env (23) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+✅ Firebase initialized (project: q-sonic)
+Error: Value for argument "data" is not a valid Firestore document. Cannot use "undefined" as a Firestore value (found in field "riderUrl"). If you want to ignore undefined values, enable `ignoreUndefinedProperties`.
+    at validateUserInput (/home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@google-cloud/firestore/build/src/serializer.js:383:19)
+    at validateUserInput (/home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@google-cloud/firestore/build/src/serializer.js:375:13)
+    at validateDocumentData (/home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@google-cloud/firestore/build/src/write-batch.js:609:40)
+    at /home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@google-cloud/firestore/build/src/reference/collection-reference.js:214:52
+    at /home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@google-cloud/firestore/build/src/telemetry/enabled-trace-util.js:110:30
+    at NoopContextManager.with (/home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@opentelemetry/api/src/context/NoopContextManager.ts:31:15)
+    at ContextAPI.with (/home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@opentelemetry/api/src/api/context.ts:77:42)
+    at NoopTracer.startActiveSpan (/home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@opentelemetry/api/src/trace/NoopTracer.ts:98:27)
+    at ProxyTracer.startActiveSpan (/home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@opentelemetry/api/src/trace/ProxyTracer.ts:51:20)
+    at EnabledTraceUtil.startActiveSpan (/home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/node_modules/@google-cloud/firestore/build/src/telemetry/enabled-trace-util.js:102:28)

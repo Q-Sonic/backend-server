@@ -183,6 +183,7 @@ Crea un nuevo perfil de artista. **Solo rol admin.**
 Solo usuarios con rol **artista** pueden acceder. Cada artista gestiona sus propios servicios (concierto, acústico, evento privado).
 
 ### `GET /artist-services`
+<<<<<<< HEAD
 Lista los servicios del artista autenticado con soporte para paginación y filtros.
 
 **Query Params (Opcionales)**
@@ -190,6 +191,10 @@ Lista los servicios del artista autenticado con soporte para paginación y filtr
 - `take`: Cantidad de registros a retornar (default: 20).
 - `filterField`: Campo para búsqueda por texto.
 - `filterValue`: Valor a buscar (prefijo).
+=======
+Lista los servicios del artista autenticado.
+Incluye los IDs (`contractId`, `technicalRiderId`) y también los objetos hijos (`contract`, `technicalRider`) cuando existen.
+>>>>>>> 6341acb0266757fe273ffb94d6617618ccd911ec
 
 **Response 200**
 ```json
@@ -223,6 +228,7 @@ Obtiene un servicio por ID (solo si pertenece al artista).
 ### `POST /artist-services`
 Crea un nuevo servicio. Acepta **multipart/form-data** para la imagen (`imageUrl`).
 
+<<<<<<< HEAD
 **Body** (form-data)
 - `name`: Nombre del servicio (Requerido)
 - `price`: Precio (Requerido)
@@ -230,6 +236,24 @@ Crea un nuevo servicio. Acepta **multipart/form-data** para la imagen (`imageUrl
 - `duration`: Duración (Opcional)
 - `features`: Array JSON de características (Opcional)
 - `file`: Archivo de imagen (Opcional)
+=======
+**Body**
+```json
+{
+  "name": "Concierto",
+  "price": 500,
+  "description": "Show en vivo con banda completa",
+  "contractId": "fileContract123",
+  "technicalRiderId": "fileRider123"
+}
+```
+`name`, `price`, `contractId` y `technicalRiderId` son obligatorios.
+Validaciones:
+- ambos archivos deben existir
+- `contractId` debe ser tipo `contract`
+- `technicalRiderId` debe ser tipo `technical_rider`
+- ambos deben pertenecer al artista autenticado
+>>>>>>> 6341acb0266757fe273ffb94d6617618ccd911ec
 
 **Response 201**
 ```json
@@ -241,10 +265,72 @@ Crea un nuevo servicio. Acepta **multipart/form-data** para la imagen (`imageUrl
 ```
 
 ### `PUT /artist-services/:id`
+<<<<<<< HEAD
 Actualiza un servicio (solo si pertenece al artista).
+=======
+Actualiza un servicio (solo si pertenece al artista). Campos opcionales: `name`, `price`, `description`, `duration`, `features`, `contractId`, `technicalRiderId`.
+
+Si envías `contractId` o `technicalRiderId`, el backend valida existencia, tipo correcto y ownership.
+
+**Body** (todos opcionales)
+```json
+{
+  "name": "Concierto Premium",
+  "price": 600,
+  "description": "Nueva descripción"
+}
+```
+>>>>>>> 6341acb0266757fe273ffb94d6617618ccd911ec
 
 ### `DELETE /artist-services/:id`
 Elimina un servicio (solo si pertenece al artista) y limpia su imagen del storage.
+
+---
+
+## Artist Files (Contracts & Technical Riders) 🔒
+
+Colección Firestore: `artist_files` (tabla única para ambos tipos).
+
+Todos los registros guardan:
+- `id`
+- `artistId`
+- `type` (`contract` | `technical_rider`)
+- `originalName`
+- `fileName`
+- `mimeType`
+- `size`
+- `storagePath`
+- `url`
+- `createdAt`
+- `updatedAt`
+
+### `GET /artist-files?type=contract|technical_rider`
+Lista archivos del artista autenticado. El filtro `type` es opcional.
+
+### `POST /artist-files`
+Sube un archivo del artista.
+
+**Content-Type**: `multipart/form-data`
+
+Campos:
+- `file` (obligatorio, PDF, max 10MB)
+- `type` (obligatorio: `contract` o `technical_rider`)
+
+El archivo se guarda en:
+`artists/{artistId}/files/{type}/{generatedFileName}`
+
+### `PUT /artist-files/:id`
+Reemplaza el archivo físico de un registro existente:
+1) sube el nuevo archivo  
+2) actualiza metadata del registro  
+3) elimina del Storage el archivo anterior (`storagePath` viejo)
+
+### `DELETE /artist-files/:id`
+Elimina archivo físico + registro en Firestore.
+
+Además desancla en `artist_services`:
+- si era tipo `contract`: elimina `contractId` en servicios que lo referencian
+- si era tipo `technical_rider`: elimina `technicalRiderId` en servicios que lo referencian
 
 ---
 

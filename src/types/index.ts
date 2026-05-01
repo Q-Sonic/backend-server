@@ -1,7 +1,11 @@
 import { Request } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { UserRoleEnum } from '../enum/roles.enum';
+export { ContractStatus, PaymentStatus } from '../enum/contract.enum';
+export { TransactionType, WithdrawalStatus } from '../enum/payment.enum';
+
 import { ContractStatus, PaymentStatus } from '../enum/contract.enum';
+import { TransactionType, WithdrawalStatus } from '../enum/payment.enum';
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 export type UserRole = UserRoleEnum.CLIENTE | UserRoleEnum.ARTISTA | UserRoleEnum.ORGANIZACION | UserRoleEnum.ADMIN | UserRoleEnum.SOPORTE;
@@ -23,7 +27,7 @@ export interface UserRecord {
     displayName: string;
     role: UserRole;
     photoURL?: string;
-    emailVerified: boolean; // false al registrarse, true al verificar
+    emailVerified: boolean;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -45,7 +49,7 @@ export interface LoginResponse {
     role: UserRole;
 }
 
-// ─── Respuesta de Registro (incluye tokens para login automático) ───────────
+// ─── Respuesta de Registro ──────────────────────────────────────────────────
 export interface RegisterResponse extends LoginResponse {
     user: UserRecord;
     verification?: {
@@ -56,9 +60,6 @@ export interface RegisterResponse extends LoginResponse {
 }
 
 // ─── Respuesta de Login con Google OAuth ─────────────────────────────────────
-// El `customToken` es firmado por el servidor (Admin SDK).
-// El cliente debe usar: signInWithCustomToken(firebaseClientAuth, customToken)
-// para obtener un idToken de sesión con los custom claims del usuario.
 export interface GoogleLoginResponse {
     customToken: string;
     uid: string;
@@ -77,21 +78,22 @@ export interface EmailVerificationRecord {
     createdAt: FirebaseFirestore.Timestamp;
 }
 
-// ─── Servicio del artista (tipo de espectáculo con precio) ──────────────────
+// ─── Servicio del artista ────────────────────────────────────────────────────
 export interface ArtistServiceRecord {
     id: string;
     artistId: string;
     name: string;
     price: number;
     description: string;
-    /** Format: '60-90 min', '2 hours', etc. */
     duration?: string;
-    /** List of features (e.g., ['Equipo de sonido incluido', 'Músicos de apoyo']) */
     features?: string[];
-    /** Rider URL (PDF in Storage) */
     riderUrl?: string;
-    /** Cover image URL for service card/modal */
+    technicalRiderId?: string;
+    contractId?: string;
+    contract?: ArtistFileRecord | null;
+    technicalRider?: ArtistFileRecord | null;
     imageUrl?: string;
+    isPinned?: boolean;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -114,11 +116,32 @@ export interface CreateArtistServiceInput {
     duration?: string;
     features?: string[];
     imageUrl?: string;
+    isPinned?: boolean;
+    contractId?: string;
+    technicalRiderId?: string;
 }
 
 export type UpdateArtistServiceInput = Partial<CreateArtistServiceInput>;
 
-// ─── Perfil de cliente (US-6, US-7) ───────────────────────────────────────────
+export type ArtistFileType = 'contract' | 'technical_rider';
+
+export interface ArtistFileRecord {
+    id: string;
+    artistId: string;
+    type: ArtistFileType;
+    name?: string;
+    description?: string;
+    originalName: string;
+    fileName: string;
+    mimeType: string;
+    size: number;
+    storagePath: string;
+    url: string;
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+}
+
+// ─── Perfil de cliente ───────────────────────────────────────────────────────
 export interface ClientProfileRecord {
     uid: string;
     name: string;
@@ -136,7 +159,7 @@ export interface CreateOrUpdateClientProfileInput {
     photo?: string;
 }
 
-// ─── Perfil de artista (US-10) ────────────────────────────────────────────────
+// ─── Perfil de artista ────────────────────────────────────────────────────────
 export interface SocialNetworks {
     instagram?: string;
     facebook?: string;
@@ -145,14 +168,11 @@ export interface SocialNetworks {
     tiktok?: string;
 }
 
-/** Single media item in artist gallery (image, audio, video). */
 export interface ArtistProfileMediaItem {
     url: string;
     type: 'image' | 'audio' | 'video';
     name?: string;
-    /** Optional cover image for audio songs */
     coverUrl?: string;
-    /** Category for gallery filtering (e.g., 'Conciertos', 'Backstage', 'Fans') */
     category?: string;
 }
 
@@ -168,31 +188,22 @@ export interface ArtistProfileRecord {
     socialNetworks: SocialNetworks;
     photo: string;
     city: string;
-    /** List of blocked dates in YYYY-MM-DD format. */
     blockedDates?: string[];
-    /** Featured song for the profile player. */
     featuredSong?: {
         title: string;
         artistName: string;
         streamUrl: string;
         coverUrl?: string;
     };
-    /** Artist's main genre (e.g. 'Pop', 'Salsa', 'Rock') */
     genre?: string;
-    /** Minimum price for services (for search indexing) */
     minPrice?: number;
-    /** Link to technical rider (PDF) */
     technicalRiderUrl?: string;
-    /** Gallery media URLs (images, audio, video). */
     media?: ArtistProfileMediaItem[];
-    /** Songs managed independently from gallery. */
     songs?: ArtistSongItem[];
-    /** Stats for dashboard */
+    totalBalance: number;
     totalVisits?: number;
-    /** Map of date (YYYY-MM-DD) -> count */
+    totalHires?: number;
     visitsHistory?: Record<string, number>;
-    /** Artist balance for payments/payouts */
-    balance?: number;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -223,15 +234,16 @@ export interface CreateOrUpdateArtistProfileInput {
         coverUrl?: string;
     };
     technicalRiderUrl?: string;
+    minPrice?: number;
 }
 
 export interface ArtistAvailability {
-    blocked: string[]; // Manual blocks
-    reserved: string[]; // ACCEPTED/COMPLETED contracts
-    pending: string[]; // PENDING contracts
+    blocked: string[];
+    reserved: string[];
+    pending: string[];
 }
 
-// ─── Contratos, Eventos y Pagos (US-8) ──────────────────────────────────────
+// ─── Contratos, Eventos y Pagos ──────────────────────────────────────────────
 export interface EventDetails {
     name: string;
     date: FirebaseFirestore.Timestamp;
@@ -261,10 +273,22 @@ export interface ContractRecord {
     eventDetails: EventDetails;
     financials: ContractFinancials;
     payments: PaymentItem[];
-    /** PDF Contract URL */
     contractUrl?: string;
-    /** Captured Rider URL at booking time */
+    signatureReceiptUrl?: string;
+    sourceContractUrl?: string;
+    sourceContractFileId?: string;
+    sourceContractOriginalName?: string;
     riderUrl?: string;
+    clientSignatureUrl?: string;
+    clientAcceptedTerms?: boolean;
+    clientSignedAt?: FirebaseFirestore.Timestamp;
+    artistSignatureUrl?: string;
+    artistAcceptedTerms?: boolean;
+    artistSignedAt?: FirebaseFirestore.Timestamp;
+    artistDecisionDeadlineAt?: FirebaseFirestore.Timestamp;
+    artistRejectionReason?: string;
+    clientName?: string;
+    artistName?: string;
     createdAt: FirebaseFirestore.Timestamp;
     updatedAt: FirebaseFirestore.Timestamp;
 }
@@ -275,6 +299,8 @@ export interface ExtendedContractDetail extends ContractRecord {
         email: string;
         phone: string;
     };
+    serviceName?: string;
+    artistName?: string;
     riderDownloadUrl?: string;
     contractDownloadUrl?: string;
 }
@@ -284,11 +310,13 @@ export interface CreateContractInput {
     serviceId: string;
     eventDetails: {
         name: string;
-        date: string | number | Date;
+        date: string | number | Date | FirebaseFirestore.Timestamp;
         location: string;
         description?: string;
     };
     totalAmount: number;
+    clientSignatureDataUrl?: string;
+    acceptedTerms?: boolean;
 }
 
 export interface AddPaymentInput {
@@ -304,4 +332,46 @@ export interface PasswordResetRecord {
     expiresAt: FirebaseFirestore.Timestamp;
     verified: boolean;
     createdAt: FirebaseFirestore.Timestamp;
+}
+
+// ─── Wallet & Withdrawals ────────────────────────────────────────────────────
+export interface WalletTransactionRecord {
+    id: string;
+    artistId: string;
+    amount: number;
+    type: TransactionType;
+    description: string;
+    orderId?: string;
+    transactionId?: string;
+    createdAt: FirebaseFirestore.Timestamp;
+}
+
+export interface WithdrawalRequestRecord {
+    id: string;
+    artistId: string;
+    amount: number;
+    status: WithdrawalStatus;
+    bankDetails?: {
+        bankName: string;
+        accountNumber: string;
+        accountType: string;
+        holderName: string;
+        holderDocument: string;
+    };
+    adminNotes?: string;
+    processedAt?: FirebaseFirestore.Timestamp;
+    processedBy?: string;
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+}
+
+export interface WithdrawalRequestInput {
+    amount: number;
+    bankDetails: {
+        bankName: string;
+        accountNumber: string;
+        accountType: string;
+        holderName: string;
+        holderDocument: string;
+    };
 }

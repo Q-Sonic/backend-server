@@ -7,6 +7,7 @@ import {
     updateService,
     deleteService,
     listAllServicesByArtistId,
+    listBookableServicesForClientByArtistId,
 } from './artist-services.controller';
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { roleGuard } from '../../middleware/role.middleware';
@@ -61,6 +62,12 @@ router.get('/', listMyServices);
 router.get('/all/:artistId', listAllServicesByArtistId);
 
 /**
+ * Client-visible catalog: services that have both contract and technical rider documents linked.
+ * Must be registered before `/:id` so `client` is not captured as a service id.
+ */
+router.get('/client/:artistId', listBookableServicesForClientByArtistId);
+
+/**
  * @swagger
  * /artist-services/{id}:
  *   get:
@@ -89,7 +96,7 @@ router.get('/:id', getServiceById);
  * /artist-services:
  *   post:
  *     tags: [Artist Services]
- *     summary: Crear un nuevo servicio musical (requiere contractId y technicalRiderId)
+ *     summary: Crear un nuevo servicio musical (solo name y price son obligatorios)
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
@@ -97,7 +104,7 @@ router.get('/:id', getServiceById);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name, price, contractId, technicalRiderId]
+ *             required: [name, price]
  *             properties:
  *               name: { type: string, example: 'Show en vivo' }
  *               price: { type: number, example: 500 }

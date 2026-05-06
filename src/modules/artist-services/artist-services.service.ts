@@ -115,11 +115,15 @@ export class ArtistServicesService extends BaseFirestoreService<ArtistServiceRec
     }
 
     async createService(artistId: string, input: CreateArtistServiceInput): Promise<ArtistServiceRecord> {
-        if (input.contractId) {
-            await this.validateArtistFileOwnership(input.contractId, artistId, 'contract');
+        const normalizedContractId = typeof input.contractId === 'string' ? input.contractId.trim() : '';
+        const normalizedTechnicalRiderId =
+            typeof input.technicalRiderId === 'string' ? input.technicalRiderId.trim() : '';
+
+        if (normalizedContractId) {
+            await this.validateArtistFileOwnership(normalizedContractId, artistId, 'contract');
         }
-        if (input.technicalRiderId) {
-            await this.validateArtistFileOwnership(input.technicalRiderId, artistId, 'technical_rider');
+        if (normalizedTechnicalRiderId) {
+            await this.validateArtistFileOwnership(normalizedTechnicalRiderId, artistId, 'technical_rider');
         }
 
         const service = await this.create({
@@ -131,8 +135,8 @@ export class ArtistServicesService extends BaseFirestoreService<ArtistServiceRec
             features: input.features ?? [],
             imageUrl: (input.imageUrl ?? '').trim(),
             isPinned: Boolean(input.isPinned),
-            contractId: input.contractId || undefined,
-            technicalRiderId: input.technicalRiderId || undefined,
+            ...(normalizedContractId ? { contractId: normalizedContractId } : {}),
+            ...(normalizedTechnicalRiderId ? { technicalRiderId: normalizedTechnicalRiderId } : {}),
         });
 
         await this.syncMinPrice(artistId);

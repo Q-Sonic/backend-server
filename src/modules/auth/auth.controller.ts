@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AuthRequest, UserRole } from '../../types';
+import { AuthRequest, IdentityDocumentType, UserRole } from '../../types';
 import { AuthService } from './auth.service';
 import { sendSuccess, sendCreated, sendError } from '../../utils/response.util';
 
@@ -10,6 +10,8 @@ interface RegisterBody {
     password: string;
     displayName: string;
     role: UserRole;
+    identificationType?: IdentityDocumentType;
+    identificationNumber?: string;
 }
 
 interface LoginBody {
@@ -43,14 +45,21 @@ interface ResetPasswordBody {
 
 export async function register(req: Request, res: Response): Promise<void> {
     try {
-        const { email, password, displayName, role } = req.body as RegisterBody;
+        const { email, password, displayName, role, identificationType, identificationNumber } = req.body as RegisterBody;
 
         if (!email || !password || !displayName || !role) {
             sendError({ res, error: 'email, password, displayName and role are required', statusCode: 400 });
             return;
         }
 
-        const user = await authService.register({ email, password, displayName, role });
+        const user = await authService.register({
+            email,
+            password,
+            displayName,
+            role,
+            identificationType,
+            identificationNumber,
+        });
         sendCreated(res, user, 'User registered successfully');
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Registration failed';

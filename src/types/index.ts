@@ -9,6 +9,7 @@ import { TransactionType, WithdrawalStatus } from '../enum/payment.enum';
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 export type UserRole = UserRoleEnum.CLIENTE | UserRoleEnum.ARTISTA | UserRoleEnum.ORGANIZACION | UserRoleEnum.ADMIN | UserRoleEnum.SOPORTE;
+export type IdentityDocumentType = 'cedula' | 'ruc' | 'pasaporte';
 
 // ─── Custom Claims embebidos en el JWT de Firebase ────────────────────────────
 export interface UserClaims {
@@ -26,6 +27,8 @@ export interface UserRecord {
     email: string;
     displayName: string;
     role: UserRole;
+    identificationType?: IdentityDocumentType;
+    identificationNumber?: string;
     photoURL?: string;
     emailVerified: boolean;
     createdAt: FirebaseFirestore.Timestamp;

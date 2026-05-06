@@ -91,7 +91,10 @@ export class EventsService {
         try {
             const serviceDoc = await this.db.collection('artist_services').doc(data.serviceId).get();
             if (serviceDoc.exists) {
-                detail.serviceName = serviceDoc.data()?.name || 'Servicio Musical';
+                const sData = serviceDoc.data();
+                detail.serviceName = sData?.name || 'Servicio Musical';
+                detail.duration = sData?.duration || '90 mins';
+                detail.serviceDescription = sData?.description || '';
             }
         } catch (e) {
             console.error('Error fetching service info:', e);

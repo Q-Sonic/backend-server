@@ -300,6 +300,8 @@ export interface ExtendedContractDetail extends ContractRecord {
         phone: string;
     };
     serviceName?: string;
+    duration?: string;
+    serviceDescription?: string;
     artistName?: string;
     riderDownloadUrl?: string;
     contractDownloadUrl?: string;

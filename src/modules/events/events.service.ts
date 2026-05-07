@@ -116,8 +116,9 @@ export class EventsService {
             }
         }
 
-        if (data.contractUrl) {
-            const contractPath = extractFilePathFromStorageUrl(data.contractUrl);
+        const finalContractUrl = data.contractUrl || data.sourceContractUrl;
+        if (finalContractUrl) {
+            const contractPath = extractFilePathFromStorageUrl(finalContractUrl);
             if (contractPath) {
                 detail.contractDownloadUrl = await this.storageService.getSignedUrl(contractPath);
             }

@@ -1,7 +1,15 @@
 import PDFDocument from 'pdfkit';
-import { ContractRecord, UserRecord } from '../../types';
+import { ContractRecord, EventDetails, UserRecord } from '../../types';
 
 export class PdfService {
+    private formatDateKey(dateKey: string): string {
+        const [y, m, d] = dateKey.split('-').map(Number);
+        if (!y || !m || !d) return dateKey;
+        return new Date(y, m - 1, d).toLocaleDateString('es-EC', {
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        });
+    }
+
     private timestampLabel(value: unknown): string {
         const anyValue = value as { toDate?: () => Date; _seconds?: number } | string | undefined;
         let date: Date | null = null;
@@ -65,10 +73,26 @@ export class PdfService {
             doc.fillColor('#0E1726').fontSize(13).font('Helvetica-Bold').text('Detalle del evento', 46, 218);
             doc.fillColor('#1F2937').fontSize(10).font('Helvetica');
             doc.text(`Servicio / Evento: ${contract.eventDetails?.name || 'Evento'}`, 46, 238);
-            doc.text(`Fecha y hora: ${this.timestampLabel(contract.eventDetails?.date)}`, 46, 254);
-            doc.text(`Ubicación: ${contract.eventDetails?.location || 'Por definir'}`, 46, 270);
-            if (contract.eventDetails?.description) {
-                doc.text(`Notas: ${contract.eventDetails.description}`, 46, 286, { width: doc.page.width - 92 });
+
+            const extraDates = (contract.eventDetails as EventDetails & { eventDates?: string[] })?.eventDates;
+            if (Array.isArray(extraDates) && extraDates.length > 1) {
+                doc.text(`Fechas del evento (${extraDates.length}):`, 46, 254);
+                let cursor = 270;
+                extraDates.forEach((dk, i) => {
+                    const label = this.formatDateKey(dk);
+                    doc.text(`  ${i + 1}. ${label}`, 46, cursor, { width: doc.page.width - 92 });
+                    cursor += 14;
+                });
+                doc.text(`Ubicación: ${contract.eventDetails?.location || 'Por definir'}`, 46, cursor + 4);
+                if (contract.eventDetails?.description) {
+                    doc.text(`Notas: ${contract.eventDetails.description}`, 46, cursor + 20, { width: doc.page.width - 92 });
+                }
+            } else {
+                doc.text(`Fecha y hora: ${this.timestampLabel(contract.eventDetails?.date)}`, 46, 254);
+                doc.text(`Ubicación: ${contract.eventDetails?.location || 'Por definir'}`, 46, 270);
+                if (contract.eventDetails?.description) {
+                    doc.text(`Notas: ${contract.eventDetails.description}`, 46, 286, { width: doc.page.width - 92 });
+                }
             }
 
             doc.fillColor('#0E1726').fontSize(13).font('Helvetica-Bold').text('Términos financieros', 46, 330);

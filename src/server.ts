@@ -1,5 +1,6 @@
 import { getEnv } from './config/env';
 import { initFirebase } from './config/firebase';
+import { initContractJobs } from './modules/jobs/contract-jobs.service';
 import app from './app';
 
 async function bootstrap(): Promise<void> {
@@ -7,7 +8,10 @@ async function bootstrap(): Promise<void> {
     const { PORT, NODE_ENV } = getEnv();
     initFirebase();
 
-    // 2. Start HTTP server
+    // 2. Initialize scheduled jobs (cron)
+    initContractJobs();
+
+    // 3. Start HTTP server
     app.listen(PORT, () => {
         console.log(`Q-Music Backend running on port ${PORT} [${NODE_ENV}]`);
         console.log(`Health: http://localhost:${PORT}/api/health`);

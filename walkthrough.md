@@ -41,5 +41,11 @@ Se han completado todas las implementaciones solicitadas basándose en el docume
 > Podés crearlo directamente entrando a este link (que ya estaba en tu reporte):
 > [Crear Índice Composite](https://console.firebase.google.com/v1/r/project/q-sonic/firestore/indexes?create_composite=ClNwcm9qZWN0cy9xLXNvbmljL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy93aXRoZHJhd2FsX3JlcXVlc3RzL2luZGV4ZXMvXxABGgwKCGFydGlzdElkEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg)
 
+## 8. Estabilización de Pasarela de Pagos (Nuvei / Paymentez)
+- **Fix Autenticación:** Se corrigió la generación del `Auth-Token`. Se detectó que el hash SHA256 debe incluir únicamente el `SECRET + TIMESTAMP`. Anteriormente se incluía la `SERVER_KEY`, lo que causaba el error 401 (Unauthorized).
+- **Cumplimiento de Esquema:** Se agregaron los campos `pending_url` y `review_url` como obligatorios en la configuración de LinkToPay para el ambiente de Staging, evitando errores de validación 400.
+- **Archivo:** [payments.service.ts](file:///home/jsojo/Documentos/quanticarch/Q-Music-Arch/Q-Music-Backend/src/modules/payments/payments.service.ts).
+
 ---
+
 ¡Backend estabilizado y actualizado!

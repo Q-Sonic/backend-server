@@ -25,10 +25,12 @@ export class PaymentsService {
     private static getAuthHeader(): string {
         const { NUVEI_LTP_SERVER_KEY, NUVEI_LTP_SERVER_SECRET } = getEnv();
         const unixTimestamp = Math.floor(Date.now() / 1000).toString();
-        const uniqToken = crypto.createHash('sha256').update(NUVEI_LTP_SERVER_KEY + unixTimestamp + NUVEI_LTP_SERVER_SECRET).digest('hex');
+        // El hash (UNIQ-TOKEN) se genera solo con SECRET + TIMESTAMP
+        const uniqToken = crypto.createHash('sha256').update(NUVEI_LTP_SERVER_SECRET + unixTimestamp).digest('hex');
         const authString = `${NUVEI_LTP_SERVER_KEY};${unixTimestamp};${uniqToken}`;
         return Buffer.from(authString).toString('base64');
     }
+
 
     static async createPaymentLink(payload: any) {
         const { NUVEI_API_ENDPOINT, FRONT_DNS } = getEnv();
@@ -44,7 +46,10 @@ export class PaymentsService {
                     allowed_payment_methods: ['All'],
                     success_url: payload.configuration?.success_url || `${FRONT_DNS}/payments/success`,
                     failure_url: payload.configuration?.failure_url || `${FRONT_DNS}/payments/failure`,
+                    pending_url: payload.configuration?.pending_url || `${FRONT_DNS}/payments/pending`,
+                    review_url: payload.configuration?.review_url || `${FRONT_DNS}/payments/review`,
                 }
+
             };
             const response = await axios.post(url, body, { headers: { 'Content-Type': 'application/json', 'Auth-Token': this.getAuthHeader() } });
             if (response.data.success) {

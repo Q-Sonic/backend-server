@@ -311,6 +311,7 @@ export class ContractsService {
                     eventName: contract.eventDetails?.name || 'Evento',
                     wasPaid,
                     amount: wasPaid ? (contract.financials?.paidAmount || contract.financials?.totalAmount || 0) : undefined,
+                    contractId: id,
                 });
             }
         } catch (mailErr) {

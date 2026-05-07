@@ -175,7 +175,8 @@ export class MailService {
             <tr><td style="padding:6px 0;color:#888;font-size:13px;">Monto total pagado</td><td style="padding:6px 0;text-align:right;color:#38BACC;font-weight:800;font-size:20px;">$${data.amount.toFixed(2)}</td></tr>
             <tr><td style="padding:4px 0;color:#888;font-size:12px;">ID de transacción</td><td style="padding:4px 0;text-align:right;color:#aaa;font-size:12px;">${this.escapeHtml(data.transactionId)}</td></tr>
             ${data.authorizationCode ? `<tr><td style="padding:4px 0;color:#888;font-size:12px;">Autorización</td><td style="padding:4px 0;text-align:right;color:#aaa;font-size:12px;">${this.escapeHtml(data.authorizationCode)}</td></tr>` : ''}
-            <tr><td style="padding:4px 0;color:#888;font-size:12px;">Referencia</td><td style="padding:4px 0;text-align:right;color:#aaa;font-size:12px;">${this.escapeHtml(data.orderId)}</td></tr>
+            <tr><td style="padding:4px 0;color:#888;font-size:12px;">Referencia de orden</td><td style="padding:4px 0;text-align:right;color:#aaa;font-size:12px;">${this.escapeHtml(data.orderId)}</td></tr>
+            ${data.contractId ? `<tr><td style="padding:4px 0;color:#888;font-size:12px;">ID de contrato</td><td style="padding:4px 0;text-align:right;color:#aaa;font-size:12px;font-family:monospace;">${this.escapeHtml(data.contractId)}</td></tr>` : ''}
           </table>
 
           <p style="font-size:13px;color:#888;line-height:1.6;">
@@ -212,6 +213,7 @@ export class MailService {
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Motivo</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(data.reason)}</td></tr>
             <tr><td colspan="2"><div style="border-top:1px solid #2a2d35;margin:8px 0;"></div></td></tr>
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Monto a reembolsar</td><td style="padding:8px 0;text-align:right;color:#38BACC;font-weight:800;font-size:18px;">$${data.amount.toFixed(2)}</td></tr>
+            ${data.contractId ? `<tr><td style="padding:4px 0;color:#555;font-size:11px;">ID de contrato</td><td style="padding:4px 0;text-align:right;color:#555;font-size:11px;font-family:monospace;">${this.escapeHtml(data.contractId)}</td></tr>` : ''}
           </table>
 
           <p style="font-size:13px;color:#888;line-height:1.6;">
@@ -248,6 +250,7 @@ export class MailService {
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Fecha del evento</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(data.eventDate)}</td></tr>
             <tr><td colspan="2"><div style="border-top:1px solid #2a2d35;margin:8px 0;"></div></td></tr>
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Monto pendiente</td><td style="padding:8px 0;text-align:right;color:${warningColor};font-weight:800;font-size:18px;">$${data.amount.toFixed(2)}</td></tr>
+            <tr><td style="padding:4px 0;color:#555;font-size:11px;">ID de contrato</td><td style="padding:4px 0;text-align:right;color:#555;font-size:11px;font-family:monospace;">${this.escapeHtml(data.contractId)}</td></tr>
           </table>
 
           <p style="font-size:13px;color:#888;line-height:1.6;">
@@ -268,6 +271,7 @@ export class MailService {
         userName: string;
         eventName: string;
         eventDate: string;
+        contractId?: string;
     }): Promise<void> {
         const tx = this.getTransporter();
         const subject = `Reserva cancelada por falta de pago — ${data.eventName}`;
@@ -279,6 +283,7 @@ export class MailService {
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Cliente</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(data.userName)}</td></tr>
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Evento</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(data.eventName)}</td></tr>
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Fecha planificada</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(data.eventDate)}</td></tr>
+            ${data.contractId ? `<tr><td style="padding:4px 0;color:#555;font-size:11px;">ID de contrato</td><td style="padding:4px 0;text-align:right;color:#555;font-size:11px;font-family:monospace;">${this.escapeHtml(data.contractId)}</td></tr>` : ''}
           </table>
 
           <p style="font-size:13px;color:#888;line-height:1.6;">
@@ -300,6 +305,7 @@ export class MailService {
         eventName: string;
         wasPaid: boolean;
         amount?: number;
+        contractId?: string;
     }): Promise<void> {
         const tx = this.getTransporter();
         const subject = `Reserva cancelada — ${data.eventName}`;
@@ -310,6 +316,7 @@ export class MailService {
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#1a1d22;border-radius:12px;padding:20px;margin-bottom:24px;">
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Evento</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(data.eventName)}</td></tr>
             ${data.wasPaid && data.amount != null ? `<tr><td style="padding:8px 0;color:#888;font-size:13px;">Reembolso</td><td style="padding:8px 0;text-align:right;color:#38BACC;font-weight:700;">$${data.amount.toFixed(2)}</td></tr>` : ''}
+            ${data.contractId ? `<tr><td style="padding:4px 0;color:#555;font-size:11px;">ID de contrato</td><td style="padding:4px 0;text-align:right;color:#555;font-size:11px;font-family:monospace;">${this.escapeHtml(data.contractId)}</td></tr>` : ''}
           </table>
 
           ${data.wasPaid
@@ -352,6 +359,7 @@ export class MailService {
             ${details.eventDate ? `<tr><td style="padding:8px 0;color:#888;font-size:13px;">Fecha</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(details.eventDate)}</td></tr>` : ''}
             ${details.eventLocation ? `<tr><td style="padding:8px 0;color:#888;font-size:13px;">Lugar</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(details.eventLocation)}</td></tr>` : ''}
             ${details.amount != null ? `<tr><td colspan="2"><div style="border-top:1px solid #2a2d35;margin:8px 0;"></div></td></tr><tr><td style="padding:8px 0;color:#888;font-size:13px;">Monto</td><td style="padding:8px 0;text-align:right;color:#38BACC;font-weight:800;font-size:18px;">$${details.amount.toFixed(2)}</td></tr>` : ''}
+            <tr><td style="padding:4px 0;color:#555;font-size:11px;">ID de contrato</td><td style="padding:4px 0;text-align:right;color:#555;font-size:11px;font-family:monospace;">${this.escapeHtml(details.contractId)}</td></tr>
           </table>
 
           ${details.contractUrl ? `<div style="text-align:center;margin:24px 0;"><a href="${details.contractUrl}" style="display:inline-block;background:#38BACC;color:#000;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;">Ver Contrato</a></div>` : ''}
@@ -369,6 +377,7 @@ export class MailService {
         eventName: string;
         amount: number;
         artistName: string;
+        contractId?: string;
     }): Promise<void> {
         const tx = this.getTransporter();
         const subject = `💳 Reembolso automático — el artista no confirmó tu reserva`;
@@ -381,6 +390,7 @@ export class MailService {
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Artista</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(data.artistName)}</td></tr>
             <tr><td colspan="2"><div style="border-top:1px solid #2a2d35;margin:8px 0;"></div></td></tr>
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Reembolso</td><td style="padding:8px 0;text-align:right;color:#38BACC;font-weight:800;font-size:18px;">$${data.amount.toFixed(2)}</td></tr>
+            ${data.contractId ? `<tr><td style="padding:4px 0;color:#555;font-size:11px;">ID de contrato</td><td style="padding:4px 0;text-align:right;color:#555;font-size:11px;font-family:monospace;">${this.escapeHtml(data.contractId)}</td></tr>` : ''}
           </table>
 
           <p style="font-size:13px;color:#888;line-height:1.6;">
@@ -414,6 +424,7 @@ export class MailService {
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Cliente</td><td style="padding:8px 0;text-align:right;color:#fff;">${this.escapeHtml(details.clientName)}</td></tr>
             <tr><td colspan="2"><div style="border-top:1px solid #2a2d35;margin:8px 0;"></div></td></tr>
             <tr><td style="padding:8px 0;color:#888;font-size:13px;">Monto</td><td style="padding:8px 0;text-align:right;color:#38BACC;font-weight:800;font-size:18px;">$${details.amount.toFixed(2)}</td></tr>
+            <tr><td style="padding:4px 0;color:#555;font-size:11px;">ID de contrato</td><td style="padding:4px 0;text-align:right;color:#555;font-size:11px;font-family:monospace;">${this.escapeHtml(details.contractId)}</td></tr>
           </table>
           <p style="font-size:13px;color:#888;">Ingresa a la plataforma para revisar los detalles y firmar o rechazar la reserva.</p>
         `);

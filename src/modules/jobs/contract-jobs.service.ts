@@ -68,6 +68,7 @@ async function runPaymentDeadlineCheck(): Promise<void> {
                             userName: clientName,
                             eventName: data.eventDetails?.name || 'Evento',
                             eventDate: formatDateEs(eventMs),
+                            contractId: doc.id,
                         });
                     }
                 } catch (mailErr) {
@@ -148,6 +149,7 @@ async function runArtistSignatureExpiryCheck(): Promise<void> {
                                 eventName: data.eventDetails?.name || 'Evento',
                                 amount: data.financials?.totalAmount || 0,
                                 artistName,
+                                contractId: doc.id,
                             });
                         }
                     } catch (mailErr) {

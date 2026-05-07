@@ -48,6 +48,80 @@ export class PaymentsController {
     }
 
     /**
+     * POST /api/payments/checkout-reference
+     * Initializes a Nuvei Checkout reference for the frontend SDK modal.
+     */
+    static async createCheckoutReference(req: Request, res: Response) {
+        try {
+            const { uid, email } = (req as AuthRequest).user!;
+            const { amount, description, dev_reference } = req.body;
+
+            if (!amount || !description || !dev_reference) {
+                return sendError({ res, error: 'Faltan parámetros (amount, description, dev_reference)', statusCode: 400 });
+            }
+
+            const result = await PaymentsService.createCheckoutReference({
+                userId: uid,
+                userEmail: email || '',
+                amount: Number(amount),
+                description,
+                devReference: dev_reference,
+            });
+
+            return sendSuccess(res, result, 'Referencia de checkout generada');
+        } catch (error: any) {
+            Logger.error('[PaymentsController] createCheckoutReference error:', error.message);
+            return sendError({ res, error: error.message || 'Error al generar la referencia de pago', statusCode: 500 });
+        }
+    }
+
+    /**
+     * POST /api/payments/checkout-group-reference
+     * Creates a single Nuvei Checkout reference for multiple contracts.
+     */
+    static async createGroupCheckoutReference(req: Request, res: Response) {
+        try {
+            const { uid, email } = (req as AuthRequest).user!;
+            const { contractIds, description } = req.body;
+
+            if (!Array.isArray(contractIds) || contractIds.length < 2) {
+                return sendError({ res, error: 'Se requieren al menos 2 contratos para el pago grupal', statusCode: 400 });
+            }
+
+            const result = await PaymentsService.createGroupCheckoutReference({
+                userId: uid,
+                userEmail: email || '',
+                contractIds,
+                description: description || `Pago grupal de ${contractIds.length} contratos`,
+            });
+
+            return sendSuccess(res, result, 'Referencia de pago grupal generada');
+        } catch (error: any) {
+            Logger.error('[PaymentsController] createGroupCheckoutReference error:', error.message);
+            return sendError({ res, error: error.message || 'Error al generar la referencia de pago grupal', statusCode: 500 });
+        }
+    }
+
+    /**
+     * POST /api/payments/confirm-checkout
+     * Called by the frontend SDK onResponse callback after a successful payment.
+     * Marks the order and contract as PAID without waiting for the webhook.
+     */
+    static async confirmCheckout(req: Request, res: Response) {
+        try {
+            const { orderKey, transactionId, amount } = req.body;
+            if (!orderKey || !transactionId) {
+                return sendError({ res, error: 'orderKey y transactionId son requeridos', statusCode: 400 });
+            }
+            await PaymentsService.confirmCheckout(orderKey, transactionId, Number(amount) || 0);
+            return sendSuccess(res, { orderKey, transactionId }, 'Pago confirmado');
+        } catch (error: any) {
+            Logger.error('[PaymentsController] confirmCheckout error:', error.message);
+            return sendError({ res, error: error.message || 'Error al confirmar el pago', statusCode: 500 });
+        }
+    }
+
+    /**
      * POST /api/payments/webhook
      * Callback received from Nuvei for transaction status updates.
      */
@@ -118,17 +192,17 @@ export class PaymentsController {
      */
     static async refund(req: Request, res: Response): Promise<void> {
         try {
-            const { transactionId, amount, description } = req.body;
+            const { transactionId, amount } = req.body;
 
             if (!transactionId) {
                 sendError({ res, error: 'transactionId is required', statusCode: 400 });
                 return;
             }
 
-            const result = await PaymentsService.refund(transactionId, amount, description);
-            sendSuccess(res, result, 'Refund processed successfully');
+            const result = await PaymentsService.refundCardTransaction(transactionId, amount);
+            sendSuccess(res, result, 'Reembolso procesado exitosamente');
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Refund failed';
+            const message = err instanceof Error ? err.message : 'Error al procesar el reembolso';
             sendError({ res, error: message, statusCode: 400 });
         }
     }

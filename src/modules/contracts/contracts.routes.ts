@@ -24,6 +24,7 @@ router.get('/:id', ContractsController.getById);
 
 router.post('/', roleGuard(UserRoleEnum.CLIENTE), validateRequest(createContractRequestSchema), ContractsController.create);
 router.patch('/:id/status', validateRequest(updateContractStatusRequestSchema), ContractsController.updateStatus);
+router.post('/:id/cancel', roleGuard(UserRoleEnum.CLIENTE), ContractsController.cancelByClient);
 router.post('/:id/payments', roleGuard(UserRoleEnum.ARTISTA), validateRequest(addPaymentRequestSchema), ContractsController.addPayment);
 router.post('/sign-all', roleGuard(UserRoleEnum.ARTISTA), ContractsController.signAll);
 

@@ -9,6 +9,7 @@ import { TransactionType, WithdrawalStatus } from '../enum/payment.enum';
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 export type UserRole = UserRoleEnum.CLIENTE | UserRoleEnum.ARTISTA | UserRoleEnum.ORGANIZACION | UserRoleEnum.ADMIN | UserRoleEnum.SOPORTE;
+export type IdentityDocumentType = 'cedula' | 'ruc' | 'pasaporte';
 
 // ─── Custom Claims embebidos en el JWT de Firebase ────────────────────────────
 export interface UserClaims {
@@ -26,6 +27,8 @@ export interface UserRecord {
     email: string;
     displayName: string;
     role: UserRole;
+    identificationType?: IdentityDocumentType;
+    identificationNumber?: string;
     photoURL?: string;
     emailVerified: boolean;
     createdAt: FirebaseFirestore.Timestamp;
@@ -246,9 +249,12 @@ export interface ArtistAvailability {
 // ─── Contratos, Eventos y Pagos ──────────────────────────────────────────────
 export interface EventDetails {
     name: string;
+    /** Primary/first event date (kept for backwards compat). */
     date: FirebaseFirestore.Timestamp;
     location: string;
     description?: string;
+    /** All selected dates when a single contract covers multiple performances (YYYY-MM-DD). */
+    eventDates?: string[];
 }
 
 export interface PaymentItem {
@@ -315,6 +321,8 @@ export interface CreateContractInput {
         date: string | number | Date | FirebaseFirestore.Timestamp;
         location: string;
         description?: string;
+        /** All selected dates when a single contract covers multiple performances (YYYY-MM-DD). */
+        eventDates?: string[];
     };
     totalAmount: number;
     clientSignatureDataUrl?: string;

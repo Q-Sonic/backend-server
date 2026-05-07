@@ -1,5 +1,14 @@
 import { getAuth, getFirestore, admin } from '../../config/firebase';
-import { UserRecord, UserRole, LoginResponse, RegisterResponse, GoogleLoginResponse, EmailVerificationRecord, PasswordResetRecord } from '../../types';
+import {
+  UserRecord,
+  UserRole,
+  LoginResponse,
+  RegisterResponse,
+  GoogleLoginResponse,
+  EmailVerificationRecord,
+  PasswordResetRecord,
+  IdentityDocumentType,
+} from '../../types';
 import { getEnv } from '../../config/env';
 import { UserRoleEnum } from '../../enum/roles.enum';
 import { VERIFICATION_CODE_EXPIRY_HOURS, VERIFICATION_CODE_LENGTH } from '../../config/verification.config';
@@ -20,6 +29,8 @@ interface RegisterInput {
   password: string;
   displayName: string;
   role: UserRole;
+  identificationType?: IdentityDocumentType;
+  identificationNumber?: string;
 }
 
 export class AuthService {
@@ -36,7 +47,26 @@ export class AuthService {
     return re.test(email);
   }
 
+  private normalizeIdentificationNumber(type: IdentityDocumentType, value: string): string {
+    const trimmed = value.trim();
+    if (type === 'pasaporte') {
+      return trimmed.toUpperCase().replace(/\s+/g, '');
+    }
+    return trimmed.replace(/\D/g, '');
+  }
+
   async register(input: RegisterInput): Promise<RegisterResponse> {
+    const hasIdentificationType = !!input.identificationType;
+    const hasIdentificationNumber = !!input.identificationNumber;
+    if (hasIdentificationType !== hasIdentificationNumber) {
+      throw new Error('identificationType e identificationNumber deben enviarse juntos');
+    }
+
+    const normalizedIdentificationNumber =
+      input.identificationType && input.identificationNumber
+        ? this.normalizeIdentificationNumber(input.identificationType, input.identificationNumber)
+        : undefined;
+
     let firebaseUser;
     try {
       firebaseUser = await this.auth.createUser({
@@ -62,6 +92,8 @@ export class AuthService {
       email: input.email,
       displayName: input.displayName,
       role: input.role,
+      identificationType: input.identificationType,
+      identificationNumber: normalizedIdentificationNumber,
       emailVerified: false,
       createdAt: now,
       updatedAt: now,

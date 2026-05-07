@@ -230,13 +230,23 @@ export class ArtistProfilesService {
 
         contractsSnapshot.docs.forEach(doc => {
             const data = doc.data();
-            const dateStr = this.formatDate(data.eventDetails?.date);
-            if (!dateStr) return;
 
-            if (data.status === ContractStatus.ACCEPTED || data.status === ContractStatus.COMPLETED) {
-                availability.reserved.push(dateStr);
-            } else if (data.status === ContractStatus.PENDING || data.status === ContractStatus.PENDING_ARTIST_SIGNATURE) {
-                availability.pending.push(dateStr);
+            // Collect all dates: primary date + additional eventDates (multi-date contracts)
+            const allDates: string[] = [];
+            const primaryDate = this.formatDate(data.eventDetails?.date);
+            if (primaryDate) allDates.push(primaryDate);
+            if (Array.isArray(data.eventDetails?.eventDates)) {
+                for (const d of data.eventDetails.eventDates as string[]) {
+                    if (d && !allDates.includes(d)) allDates.push(d);
+                }
+            }
+
+            for (const dateStr of allDates) {
+                if (data.status === ContractStatus.ACCEPTED || data.status === ContractStatus.COMPLETED) {
+                    availability.reserved.push(dateStr);
+                } else if (data.status === ContractStatus.PENDING || data.status === ContractStatus.PENDING_ARTIST_SIGNATURE) {
+                    availability.pending.push(dateStr);
+                }
             }
         });
 

@@ -121,6 +121,21 @@ export class ContractsController {
     }
 
     /**
+     * POST /api/contracts/:id/cancel
+     */
+    static async cancelByClient(req: AuthRequest, res: Response): Promise<Response> {
+        if (!req.user) return sendError({ res, error: 'Unauthorized', statusCode: 401 });
+
+        const { id } = req.params;
+        try {
+            const contract = await ContractsService.cancelByClient(id as string, req.user.uid);
+            return sendSuccess(res, contract, 'Contract cancelled successfully');
+        } catch (error: any) {
+            return sendError({ res, error: error.message, statusCode: 403 });
+        }
+    }
+
+    /**
      * POST /api/contracts/bulk-sign
      */
     static async signAll(req: AuthRequest, res: Response): Promise<Response> {

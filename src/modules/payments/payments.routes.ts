@@ -9,6 +9,9 @@ const router = Router();
 /**
  * Payments Endpoints
  */
+router.post('/checkout-reference', authMiddleware, PaymentsController.createCheckoutReference);
+router.post('/checkout-group-reference', authMiddleware, PaymentsController.createGroupCheckoutReference);
+router.post('/confirm-checkout', authMiddleware, PaymentsController.confirmCheckout);
 router.post('/link-to-pay', authMiddleware, PaymentsController.createLinkToPay);
 router.post('/webhook', PaymentsController.handleWebhook);
 router.post('/refund', authMiddleware, roleGuard(UserRoleEnum.ADMIN), PaymentsController.refund);

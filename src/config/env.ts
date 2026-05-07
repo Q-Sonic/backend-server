@@ -52,9 +52,18 @@ interface EnvConfig {
     MAIL_FROM: string;
     /** Email to receive notifications (withdrawals, etc.) */
     ADMIN_EMAIL?: string;
+    /** Checkout / Cards credentials (TESTNUVEISTG) */
+    NUVEI_SERVER_KEY: string;
+    NUVEI_SERVER_SECRET: string;
+    /** Cards API base URL: https://ccapi-stg.paymentez.com */
+    NUVEI_CARDS_API_ENDPOINT: string;
+    /** Link-to-Pay credentials (LINKTOPAY01) */
     NUVEI_LTP_SERVER_KEY: string;
     NUVEI_LTP_SERVER_SECRET: string;
+    /** LTP API base URL: https://noccapi-stg.paymentez.com */
     NUVEI_API_ENDPOINT: string;
+    /** Client-side key for Checkout SDK */
+    NUVEI_CLIENT_KEY: string;
     /** Frontend DNS URL (e.g. http://localhost:5173 or https://q-sonic.vercel.app) */
     FRONT_DNS: string;
 }
@@ -75,9 +84,13 @@ export function getEnv(): EnvConfig {
         SMTP_PASS,
         MAIL_FROM,
         ADMIN_EMAIL,
+        NUVEI_SERVER_KEY,
+        NUVEI_SERVER_SECRET,
+        NUVEI_CARDS_API_ENDPOINT,
         NUVEI_LTP_SERVER_KEY,
         NUVEI_LTP_SERVER_SECRET,
         NUVEI_API_ENDPOINT,
+        NUVEI_CLIENT_KEY,
         FRONT_DNS,
     } = process.env;
 
@@ -96,9 +109,13 @@ export function getEnv(): EnvConfig {
         SMTP_PASS: cleanEnvValue(SMTP_PASS, { stripSpaces: true }),
         MAIL_FROM: cleanEnvValue(MAIL_FROM),
         ADMIN_EMAIL: cleanEnvValue(ADMIN_EMAIL),
+        NUVEI_SERVER_KEY: cleanEnvValue(NUVEI_SERVER_KEY),
+        NUVEI_SERVER_SECRET: cleanEnvValue(NUVEI_SERVER_SECRET),
+        NUVEI_CARDS_API_ENDPOINT: cleanEnvValue(NUVEI_CARDS_API_ENDPOINT) || 'https://ccapi-stg.paymentez.com',
         NUVEI_LTP_SERVER_KEY: cleanEnvValue(NUVEI_LTP_SERVER_KEY),
         NUVEI_LTP_SERVER_SECRET: cleanEnvValue(NUVEI_LTP_SERVER_SECRET),
-        NUVEI_API_ENDPOINT: cleanEnvValue(NUVEI_API_ENDPOINT),
-        FRONT_DNS: cleanEnvValue(FRONT_DNS) || 'https://q-sonic.vercel.app',
+        NUVEI_API_ENDPOINT: cleanEnvValue(NUVEI_API_ENDPOINT) || 'https://noccapi-stg.paymentez.com',
+        NUVEI_CLIENT_KEY: cleanEnvValue(NUVEI_CLIENT_KEY),
+        FRONT_DNS: (cleanEnvValue(FRONT_DNS) || 'https://q-sonic.vercel.app').replace(/\/$/, ''),
     };
 }

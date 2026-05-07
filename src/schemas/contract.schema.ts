@@ -10,6 +10,7 @@ export const createContractRequestSchema = z.object({
             date: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Formato de fecha inválido' }),
             location: z.string().min(1, 'La ubicación es obligatoria'),
             description: z.string().optional(),
+            eventDates: z.array(z.string()).optional(),
         }),
         clientSignatureDataUrl: z.string().optional(),
         acceptedTerms: z.boolean().optional()
@@ -19,7 +20,10 @@ export const createContractRequestSchema = z.object({
 export const updateContractStatusRequestSchema = z.object({
     body: z.object({
         status: z.string().min(1, 'El estado es obligatorio'),
-        reason: z.string().optional()
+        reason: z.string().optional(),
+        rejectionReason: z.string().optional(),
+        artistSignatureDataUrl: z.string().optional(),
+        acceptedTerms: z.boolean().optional(),
     })
 });
 

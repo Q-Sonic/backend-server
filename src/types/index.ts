@@ -249,9 +249,12 @@ export interface ArtistAvailability {
 // ─── Contratos, Eventos y Pagos ──────────────────────────────────────────────
 export interface EventDetails {
     name: string;
+    /** Primary/first event date (kept for backwards compat). */
     date: FirebaseFirestore.Timestamp;
     location: string;
     description?: string;
+    /** All selected dates when a single contract covers multiple performances (YYYY-MM-DD). */
+    eventDates?: string[];
 }
 
 export interface PaymentItem {
@@ -318,6 +321,8 @@ export interface CreateContractInput {
         date: string | number | Date | FirebaseFirestore.Timestamp;
         location: string;
         description?: string;
+        /** All selected dates when a single contract covers multiple performances (YYYY-MM-DD). */
+        eventDates?: string[];
     };
     totalAmount: number;
     clientSignatureDataUrl?: string;

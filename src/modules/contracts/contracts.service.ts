@@ -6,6 +6,7 @@ import {
     PaymentStatus
 } from '../../types';
 import { MailService } from '../mail/mail.service';
+import { PaymentsService } from '../payments/payments.service';
 import { Logger } from '../../utils/logger.util';
 
 /**
@@ -14,6 +15,20 @@ import { Logger } from '../../utils/logger.util';
  */
 export class ContractsService {
     private static db = admin.firestore();
+
+    private static formatDateEs(raw: admin.firestore.Timestamp | Date | string | null | undefined): string {
+        let ms = 0;
+        if (!raw) return '';
+        if (raw instanceof admin.firestore.Timestamp) ms = raw.toMillis();
+        else if (raw instanceof Date) ms = raw.getTime();
+        else if (typeof raw === 'string') ms = Date.parse(raw);
+        if (!ms) return '';
+        try {
+            return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(ms));
+        } catch {
+            return new Date(ms).toISOString().slice(0, 10);
+        }
+    }
 
     /**
      * Find a contract by ID.
@@ -115,7 +130,10 @@ export class ContractsService {
                 name: input.eventDetails.name,
                 date: eventDate,
                 location: input.eventDetails.location,
-                description: input.eventDetails.description
+                description: input.eventDetails.description ?? '',
+                ...(input.eventDetails.eventDates && input.eventDetails.eventDates.length > 1
+                    ? { eventDates: input.eventDetails.eventDates }
+                    : {}),
             },
             financials: {
                 totalAmount: input.totalAmount,
@@ -128,7 +146,7 @@ export class ContractsService {
             clientSignedAt: now,
             sourceContractUrl,
             sourceContractFileId,
-            sourceContractOriginalName,
+            sourceContractOriginalName: sourceContractOriginalName ?? '',
             riderUrl: serviceData?.riderUrl || serviceData?.technicalRiderUrl || '',
             artistDecisionDeadlineAt: admin.firestore.Timestamp.fromMillis(now.toMillis() + (48 * 60 * 60 * 1000)),
             createdAt: now,
@@ -137,15 +155,15 @@ export class ContractsService {
 
         const docRef = await this.db.collection('contracts').add(contractData);
         
-        // Fix: Call with 3 arguments (legacy wrapper or full)
         try {
             const artistDoc = await this.db.collection('users').doc(input.artistId).get();
             const artistEmail = artistDoc.data()?.email;
+            const clientDoc = await this.db.collection('users').doc(clientId).get();
+            const clientName = clientDoc.data()?.displayName || 'Un cliente';
             if (artistEmail) {
-                // Using the simpler wrapper I added to MailService
                 await MailService.sendSimpleContractNotification(artistEmail, {
                     contractId: docRef.id,
-                    clientName: 'Un cliente',
+                    clientName,
                     eventName: input.eventDetails.name,
                     amount: input.totalAmount
                 });
@@ -173,14 +191,134 @@ export class ContractsService {
             updates.artistSignatureUrl = options.artistSignatureDataUrl;
             updates.artistAcceptedTerms = true;
             updates.artistSignedAt = admin.firestore.Timestamp.now();
+
+            // Send signed confirmation emails to both parties
+            try {
+                const [clientDoc, artistDoc] = await Promise.all([
+                    this.db.collection('users').doc(contract.clientId).get(),
+                    this.db.collection('users').doc(contract.artistId).get(),
+                ]);
+                const clientEmail = clientDoc.data()?.email;
+                const artistEmail = artistDoc.data()?.email;
+                const clientName = clientDoc.data()?.displayName || 'Cliente';
+                const artistName = artistDoc.data()?.displayName || 'Artista';
+                const eventDateLabel = this.formatDateEs(contract.eventDetails?.date as any);
+
+                const sharedDetails = {
+                    contractId: id,
+                    contractUrl: contract.contractUrl,
+                    serviceName: contract.eventDetails?.name || 'Servicio',
+                    eventName: contract.eventDetails?.name || 'Evento',
+                    artistName,
+                    clientName,
+                    eventDate: eventDateLabel,
+                    eventLocation: contract.eventDetails?.location,
+                    amount: contract.financials?.totalAmount,
+                };
+
+                if (clientEmail) {
+                    await MailService.sendContractSignedNotification(clientEmail, 'client', sharedDetails);
+                }
+                if (artistEmail) {
+                    await MailService.sendContractSignedNotification(artistEmail, 'artist', sharedDetails);
+                }
+            } catch (mailErr) {
+                Logger.error(`[ContractsService] Error sending signed notification for ${id}:`, mailErr);
+            }
         }
 
         if (status === ContractStatus.REJECTED) {
             updates.artistRejectionReason = options.rejectionReason || 'No especificado';
+
+            // Auto-refund the client's payment
+            try {
+                await PaymentsService.refundByContractId(id);
+            } catch (refundErr) {
+                Logger.error(`[ContractsService] Auto-refund failed for contract ${id}:`, refundErr);
+            }
+
+            // Notify client about rejection and refund
+            const rejectionPayStatus = String(contract.financials?.paymentStatus || '').toLowerCase();
+            if (rejectionPayStatus === PaymentStatus.PAID) {
+                try {
+                    const clientDoc = await this.db.collection('users').doc(contract.clientId).get();
+                    const clientEmail = clientDoc.data()?.email;
+                    const clientName = clientDoc.data()?.displayName || 'Cliente';
+                    const artistDoc = await this.db.collection('users').doc(contract.artistId).get();
+                    const artistName = artistDoc.data()?.displayName || 'el artista';
+                    if (clientEmail) {
+                        await MailService.sendRefundNotificationEmail(clientEmail, {
+                            userName: clientName,
+                            eventName: contract.eventDetails?.name || 'Evento',
+                            amount: contract.financials?.paidAmount || contract.financials?.totalAmount || 0,
+                            reason: `El artista ${artistName} no pudo aceptar tu reserva`,
+                            contractId: id,
+                        });
+                    }
+                } catch (mailErr) {
+                    Logger.error(`[ContractsService] Error sending rejection refund email for ${id}:`, mailErr);
+                }
+            }
         }
 
         await this.db.collection('contracts').doc(id).update(updates);
         return { ...contract, ...updates };
+    }
+
+    /**
+     * Cancel a contract initiated by the client, with auto-refund if paid.
+     */
+    static async cancelByClient(id: string, clientId: string): Promise<ContractRecord> {
+        const contract = await this.findById(id, clientId);
+        if (!contract) throw new Error('Contract not found');
+
+        if (contract.clientId !== clientId) {
+            throw new Error('Solo el cliente puede cancelar este contrato');
+        }
+
+        const terminal: ContractStatus[] = [ContractStatus.CANCELLED, ContractStatus.REJECTED, ContractStatus.EXPIRED];
+        if (terminal.includes(contract.status)) {
+            throw new Error('El contrato ya está cancelado o expirado');
+        }
+
+        const rawStatus = String(contract.financials?.paymentStatus || '').toLowerCase();
+        const wasPaid = rawStatus === PaymentStatus.PAID; // 'paid'
+
+        const updates = {
+            status: ContractStatus.CANCELLED,
+            updatedAt: admin.firestore.Timestamp.now(),
+        };
+
+        await this.db.collection('contracts').doc(id).update(updates);
+
+        // Auto-refund if the client had paid
+        if (wasPaid) {
+            try {
+                await PaymentsService.refundByContractId(id);
+            } catch (refundErr) {
+                Logger.error(`[ContractsService] Client cancel refund failed for ${id}:`, refundErr);
+            }
+        }
+
+        // Notify client via email
+        try {
+            const clientDoc = await this.db.collection('users').doc(clientId).get();
+            const clientEmail = clientDoc.data()?.email;
+            const clientName = clientDoc.data()?.displayName || 'Cliente';
+            if (clientEmail) {
+                await MailService.sendContractCancelledByClientEmail(clientEmail, {
+                    userName: clientName,
+                    eventName: contract.eventDetails?.name || 'Evento',
+                    wasPaid,
+                    amount: wasPaid ? (contract.financials?.paidAmount || contract.financials?.totalAmount || 0) : undefined,
+                    contractId: id,
+                });
+            }
+        } catch (mailErr) {
+            Logger.error(`[ContractsService] Cancel email failed for ${id}:`, mailErr);
+        }
+
+        return { ...contract, ...updates } as ContractRecord;
     }
 
     /**

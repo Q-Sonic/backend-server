@@ -18,6 +18,9 @@ export const createContractRequestSchema = z.object({
 });
 
 export const updateContractStatusRequestSchema = z.object({
+    params: z.object({
+        id: z.string().min(1, 'El ID del contrato es obligatorio'),
+    }),
     body: z.object({
         status: z.string().min(1, 'El estado es obligatorio'),
         reason: z.string().optional(),
@@ -28,6 +31,9 @@ export const updateContractStatusRequestSchema = z.object({
 });
 
 export const addPaymentRequestSchema = z.object({
+    params: z.object({
+        id: z.string().min(1, 'El ID del contrato es obligatorio'),
+    }),
     body: z.object({
         amount: z.number().positive('El monto debe ser mayor a cero'),
         method: z.string().optional().default('cash'),
